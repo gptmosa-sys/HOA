@@ -2251,6 +2251,7 @@
     localStorage.setItem(STORAGE_KEYS.duesAmounts, JSON.stringify(duesAmounts));
     localStorage.setItem(STORAGE_KEYS.balanceOverrides, JSON.stringify(balanceOverrides));
     localStorage.setItem(STORAGE_KEYS.actionLog, JSON.stringify(actionLog));
+    updatePendingUsersBadge();
   }
 
   function renderSectionById(id) {
@@ -2300,12 +2301,12 @@
       const data = await res.json();
       blobVersion = res.headers.get("x-blob-version") || res.headers.get("etag") || blobVersion;
       applyRemoteData(data, res.headers.get("x-persist-mode") || "blob");
-      updatePendingUsersBadge();
       renderSectionById(id);
     } catch (err) {
       console.warn("Section refresh failed; using cached data", err);
       renderSectionById(id);
     } finally {
+      updatePendingUsersBadge();
       endActivity();
     }
   }
@@ -2479,6 +2480,7 @@
       settingsListenersInitialized = true;
       settingsToggle.addEventListener("click", () => {
         settingsPanel.classList.toggle("hidden");
+        updatePendingUsersBadge();
       });
       document.addEventListener("click", event => {
         if (!settingsPanel || !settingsToggle) return;
