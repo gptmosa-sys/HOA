@@ -79,5 +79,5 @@ export default async function handler(req, res) {
 
 // Ensure Node runtime (not Edge) so filesystem fallback works.
 export const config = {
-  runtime: 'nodejs18.x'
+  runtime: 'nodejs'
 };
