@@ -24,6 +24,36 @@
     opacity: 0.9;
   }
   .storage-mode-banner.hidden { display: none; }
+  .storage-mode-row {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0 0 18px;
+  }
+  .storage-mode-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border: 1px solid rgba(31, 49, 65, 0.15);
+    background: #e4f3ff;
+    color: #12304e;
+    box-shadow: 0 12px 22px rgba(20, 32, 45, 0.16);
+  }
+  .storage-mode-chip.hidden { display: none; }
+  .storage-mode-chip[data-variant="local"] {
+    background: #d7f5d8;
+    color: #0f2e14;
+    border-color: rgba(31, 65, 45, 0.2);
+  }
+  .storage-mode-chip[data-variant="cloud"] {
+    background: #e4f3ff;
+    color: #0f2e4c;
+    border-color: rgba(31, 49, 65, 0.2);
+  }
     :root {
       --ink: #1f3141;
       --ink-muted: rgba(31, 49, 65, 0.7);
@@ -1347,6 +1377,12 @@
         <img src="logo2.PNG" alt="Kingston HOA crest">
       </div>
     </section>
+
+    <div class="storage-mode-row">
+      <div id="storage-mode-chip" class="storage-mode-chip hidden" role="status" aria-live="polite">
+        Storage mode: determining…
+      </div>
+    </div>
 
     <section class="tile-grid">
       <article class="tile-card" data-section="meetings" role="button" tabindex="0" onclick="openSection('meetings')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openSection('meetings');}">
@@ -6560,13 +6596,35 @@
 
   window.addEventListener("beforeunload", clearProjectFileObjectUrls);
 
-  const storageModeEl = document.getElementById("storage-mode-indicator");
+  let storageModeEl = document.getElementById("storage-mode-indicator");
+  let storageModeChip = document.getElementById("storage-mode-chip");
+
+  function ensureStorageModeRefs() {
+    if (!storageModeEl) storageModeEl = document.getElementById("storage-mode-indicator");
+    if (!storageModeChip) storageModeChip = document.getElementById("storage-mode-chip");
+  }
 
   function setStorageMode(mode) {
-    if (!storageModeEl) return;
+    ensureStorageModeRefs();
     const label = (mode || "").toLowerCase();
-    storageModeEl.textContent = "Storage mode: " + (label || "unknown");
-    storageModeEl.classList.remove("hidden");
+    const isLocal = label.includes("local") || label.includes("offline");
+    const variant = isLocal ? "local" : "cloud";
+    const summary = isLocal
+      ? "Local-only (this device)"
+      : "Cloud sync" + (label ? " (" + label + ")" : "");
+    const detail = isLocal
+      ? "Reading & writing to local files on this device (not the backend database)."
+      : "Synced with the backend store; local cache kept for speed.";
+
+    if (storageModeEl) {
+      storageModeEl.textContent = "Storage mode: " + (summary || "unknown");
+      storageModeEl.classList.remove("hidden");
+    }
+    if (storageModeChip) {
+      storageModeChip.textContent = detail;
+      storageModeChip.dataset.variant = variant;
+      storageModeChip.classList.remove("hidden");
+    }
   }
 
   window.onload = async function() {
