@@ -11,9 +11,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const token = process.env.BLOB_FILE_UPLOAD;
+  const token = process.env.BLOB_FILE_UPLOAD_READ_WRITE_TOKEN;
   if (!token) {
-    return res.status(500).json({ error: 'BLOB_FILE_UPLOAD is not configured' });
+    return res.status(500).json({ error: 'BLOB_FILE_UPLOAD_READ_WRITE_TOKEN is not configured' });
   }
 
   const fileNameHeader = req.headers['x-file-name'];
