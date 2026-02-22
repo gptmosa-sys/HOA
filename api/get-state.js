@@ -2,9 +2,11 @@ import { get } from '@vercel/blob';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-// Default to local file reads unless explicitly forced to blob
-const useFile = process.env.PERSIST_MODE !== 'blob';
-const FILE_PATH = path.join(process.cwd(), 'data.json');
+const isVercel = process.env.VERCEL === '1';
+const preferBlob = process.env.PERSIST_MODE === 'blob' || isVercel;
+const FILE_PATH = isVercel
+  ? path.join(process.env.TMPDIR || '/tmp', 'data.json')
+  : path.join(process.cwd(), 'data.json');
 const BLOB_KEY = 'hoa-state.json';
 
 async function readFromFile() {
@@ -27,13 +29,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const data = useFile ? await readFromFile() : await readFromBlob();
-    res.setHeader('X-Persist-Mode', useFile ? 'file' : 'blob');
+    const data = preferBlob ? await readFromBlob() : await readFromFile();
+    res.setHeader('X-Persist-Mode', preferBlob ? 'blob' : 'file');
     return res.status(200).json(data);
   } catch (error) {
-    console.error(error);
-    // Fallback: if blob fails, attempt local file
-    if (!useFile) {
+    console.error('Primary load failed', error);
+    // Fallback to file when blob fails, but only where the FS is writable.
+    if (preferBlob && !isVercel) {
       try {
         const data = await readFromFile();
         res.setHeader('X-Persist-Mode', 'file');

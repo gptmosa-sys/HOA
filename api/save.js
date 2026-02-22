@@ -2,14 +2,16 @@ import { put } from '@vercel/blob';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-// Default to local file writes unless explicitly forced to blob
-const useFile = process.env.PERSIST_MODE !== 'blob';
-const FILE_PATH = path.join(process.cwd(), 'data.json');
+const isVercel = process.env.VERCEL === '1';
+const preferBlob = process.env.PERSIST_MODE === 'blob' || isVercel;
+const FILE_PATH = isVercel
+  ? path.join(process.env.TMPDIR || '/tmp', 'data.json')
+  : path.join(process.cwd(), 'data.json');
 const BLOB_KEY = 'hoa-state.json';
 
 async function saveToFile(data) {
   await fs.writeFile(FILE_PATH, JSON.stringify(data, null, 2), 'utf8');
-  return { url: FILE_PATH };
+  return { url: FILE_PATH, mode: 'file' };
 }
 
 async function saveToBlob(data) {
@@ -18,7 +20,7 @@ async function saveToBlob(data) {
     addRandomSuffix: false,
     token: process.env.BLOB_READ_WRITE_TOKEN
   });
-  return { url };
+  return { url, mode: 'blob' };
 }
 
 export default async function handler(req, res) {
@@ -32,13 +34,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const result = useFile ? await saveToFile(data) : await saveToBlob(data);
-    res.setHeader('X-Persist-Mode', useFile ? 'file' : 'blob');
-    return res.status(200).json({ success: true, url: result.url, mode: useFile ? 'file' : 'blob' });
+    const result = preferBlob ? await saveToBlob(data) : await saveToFile(data);
+    res.setHeader('X-Persist-Mode', result.mode);
+    return res.status(200).json({ success: true, url: result.url, mode: result.mode });
   } catch (error) {
-    console.error(error);
-    // If blob save fails, fall back to local file
-    if (!useFile) {
+    console.error('Primary save failed', error);
+    // Fallback to file when blob fails, but only where the FS is writable.
+    if (preferBlob && !isVercel) {
       try {
         const result = await saveToFile(data);
         res.setHeader('X-Persist-Mode', 'file');
