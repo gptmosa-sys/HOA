@@ -2036,6 +2036,14 @@
     }
   }
 
+  let saveTimer = null;
+
+  function queueSave() {
+    clearTimeout(saveTimer);
+    // debounce frequent updates so we only POST once per quick burst
+    saveTimer = setTimeout(saveData, 800);
+  }
+
   function saveLocalData(key, value) {
     if (SHARED_KEYS.has(key)) {
       setSharedStateRef(key, value);
@@ -2046,8 +2054,7 @@
       console.error("Failed to save", key, err);
     }
     if (SHARED_KEYS.has(key)) {
-      // Fire-and-forget; keep UI responsive.
-      saveData();
+      queueSave();
     }
   }
 
