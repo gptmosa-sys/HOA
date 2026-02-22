@@ -3627,7 +3627,10 @@
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
+      reader.onerror = (err) => {
+        console.warn("File read failed", file?.name, err);
+        resolve(null); // allow save to continue even if one file fails
+      };
       reader.readAsDataURL(file);
     });
   }
