@@ -73,8 +73,14 @@ export default async function handler(req, res) {
       projects: [],
       documents: [],
       meetings: [],
+      minutes: [],
+      ideas: [],
       votes: [],
       financials: [],
+      residentDocuments: [],
+      duesAmounts: [],
+      balanceOverrides: [],
+      actionLog: [],
       timestamp: new Date().toISOString()
     };
     try {

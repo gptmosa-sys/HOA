@@ -1985,8 +1985,14 @@
   let projects = [];
   let documents = [];
   let meetings = [];
+  let minutes = [];
+  let ideas = [];
   let votes = [];
   let financials = [];
+  let residentDocuments = [];
+  let duesAmounts = [];
+  let balanceOverrides = [];
+  let actionLog = [];
   let sharedStateLoaded = false;
 
   const SHARED_KEYS = new Set([
@@ -1995,8 +2001,14 @@
     STORAGE_KEYS.projects,
     STORAGE_KEYS.documents,
     STORAGE_KEYS.meetings,
+    STORAGE_KEYS.minutes,
+    STORAGE_KEYS.ideas,
     STORAGE_KEYS.votes,
-    STORAGE_KEYS.financials
+    STORAGE_KEYS.financials,
+    STORAGE_KEYS.residentDocuments,
+    STORAGE_KEYS.duesAmounts,
+    STORAGE_KEYS.balanceOverrides,
+    STORAGE_KEYS.actionLog
   ]);
 
   function getSharedStateRef(key) {
@@ -2006,8 +2018,14 @@
       case STORAGE_KEYS.projects: return projects;
       case STORAGE_KEYS.documents: return documents;
       case STORAGE_KEYS.meetings: return meetings;
+      case STORAGE_KEYS.minutes: return minutes;
+      case STORAGE_KEYS.ideas: return ideas;
       case STORAGE_KEYS.votes: return votes;
       case STORAGE_KEYS.financials: return financials;
+      case STORAGE_KEYS.residentDocuments: return residentDocuments;
+      case STORAGE_KEYS.duesAmounts: return duesAmounts;
+      case STORAGE_KEYS.balanceOverrides: return balanceOverrides;
+      case STORAGE_KEYS.actionLog: return actionLog;
       default: return null;
     }
   }
@@ -2020,8 +2038,14 @@
       case STORAGE_KEYS.projects: projects = normalized; break;
       case STORAGE_KEYS.documents: documents = normalized; break;
       case STORAGE_KEYS.meetings: meetings = normalized; break;
+      case STORAGE_KEYS.minutes: minutes = normalized; break;
+      case STORAGE_KEYS.ideas: ideas = normalized; break;
       case STORAGE_KEYS.votes: votes = normalized; break;
       case STORAGE_KEYS.financials: financials = normalized; break;
+      case STORAGE_KEYS.residentDocuments: residentDocuments = normalized; break;
+      case STORAGE_KEYS.duesAmounts: duesAmounts = normalized; break;
+      case STORAGE_KEYS.balanceOverrides: balanceOverrides = normalized; break;
+      case STORAGE_KEYS.actionLog: actionLog = normalized; break;
       default: break;
     }
   }
@@ -2067,8 +2091,14 @@
       projects,
       documents,
       meetings,
+      minutes,
+      ideas,
       votes,
       financials,
+      residentDocuments,
+      duesAmounts,
+      balanceOverrides,
+      actionLog,
       timestamp: new Date().toISOString()
     };
 
@@ -2087,6 +2117,7 @@
       console.log('Blob save fallback: full error:', err);
       console.log('Blob save fallback: status code:', err.status || 'unknown');
       localStorage.setItem("hoa-state", JSON.stringify(fullState));
+      setStorageMode("offline/local (save failed)");
     }
   }
 
@@ -2097,13 +2128,19 @@
       const data = await res.json();
       setStorageMode(res.headers.get("x-persist-mode") || "blob");
 
-      users      = data.users      || [];
-      dues       = data.dues       || [];
-      projects   = data.projects   || [];
-      documents  = data.documents  || [];
-      meetings   = data.meetings   || [];
-      votes      = data.votes      || [];
-      financials = data.financials || [];
+      users              = data.users              || [];
+      dues               = data.dues               || [];
+      projects           = data.projects           || [];
+      documents          = data.documents          || [];
+      meetings           = data.meetings           || [];
+      minutes            = data.minutes            || [];
+      ideas              = data.ideas              || [];
+      votes              = data.votes              || [];
+      financials         = data.financials         || [];
+      residentDocuments  = data.residentDocuments  || [];
+      duesAmounts        = data.duesAmounts        || [];
+      balanceOverrides   = data.balanceOverrides   || [];
+      actionLog          = data.actionLog          || [];
       sharedStateLoaded = true;
 
       // Keep localStorage in sync for offline use.
@@ -2113,8 +2150,14 @@
       localStorage.setItem(STORAGE_KEYS.projects, JSON.stringify(projects));
       localStorage.setItem(STORAGE_KEYS.documents, JSON.stringify(documents));
       localStorage.setItem(STORAGE_KEYS.meetings, JSON.stringify(meetings));
+      localStorage.setItem(STORAGE_KEYS.minutes, JSON.stringify(minutes));
+      localStorage.setItem(STORAGE_KEYS.ideas, JSON.stringify(ideas));
       localStorage.setItem(STORAGE_KEYS.votes, JSON.stringify(votes));
       localStorage.setItem(STORAGE_KEYS.financials, JSON.stringify(financials));
+      localStorage.setItem(STORAGE_KEYS.residentDocuments, JSON.stringify(residentDocuments));
+      localStorage.setItem(STORAGE_KEYS.duesAmounts, JSON.stringify(duesAmounts));
+      localStorage.setItem(STORAGE_KEYS.balanceOverrides, JSON.stringify(balanceOverrides));
+      localStorage.setItem(STORAGE_KEYS.actionLog, JSON.stringify(actionLog));
 
       console.log("Loaded shared data from Vercel Blob");
     } catch (err) {
@@ -2124,13 +2167,19 @@
       const saved = localStorage.getItem("hoa-state");
       if (saved) {
         const parsed = JSON.parse(saved);
-        users      = parsed.users      || [];
-        dues       = parsed.dues       || [];
-        projects   = parsed.projects   || [];
-        documents  = parsed.documents  || [];
-        meetings   = parsed.meetings   || [];
-        votes      = parsed.votes      || [];
-        financials = parsed.financials || [];
+        users             = parsed.users             || [];
+        dues              = parsed.dues              || [];
+        projects          = parsed.projects          || [];
+        documents         = parsed.documents         || [];
+        meetings          = parsed.meetings          || [];
+        minutes           = parsed.minutes           || [];
+        ideas             = parsed.ideas             || [];
+        votes             = parsed.votes             || [];
+        financials        = parsed.financials        || [];
+        residentDocuments = parsed.residentDocuments || [];
+        duesAmounts       = parsed.duesAmounts       || [];
+        balanceOverrides  = parsed.balanceOverrides  || [];
+        actionLog         = parsed.actionLog         || [];
       }
       sharedStateLoaded = true;
       setStorageMode("offline/local");
