@@ -2251,7 +2251,6 @@
     localStorage.setItem(STORAGE_KEYS.duesAmounts, JSON.stringify(duesAmounts));
     localStorage.setItem(STORAGE_KEYS.balanceOverrides, JSON.stringify(balanceOverrides));
     localStorage.setItem(STORAGE_KEYS.actionLog, JSON.stringify(actionLog));
-    updatePendingUsersBadge();
   }
 
   function renderSectionById(id) {
@@ -2306,7 +2305,6 @@
       console.warn("Section refresh failed; using cached data", err);
       renderSectionById(id);
     } finally {
-      updatePendingUsersBadge();
       endActivity();
     }
   }
@@ -2480,7 +2478,6 @@
       settingsListenersInitialized = true;
       settingsToggle.addEventListener("click", () => {
         settingsPanel.classList.toggle("hidden");
-        updatePendingUsersBadge();
       });
       document.addEventListener("click", event => {
         if (!settingsPanel || !settingsToggle) return;
@@ -6843,29 +6840,16 @@
   function updatePendingUsersBadge() {
     const badge = document.getElementById("pending-users-badge");
     const gearDot = document.getElementById("settings-alert-dot");
-    const current = getFullCurrentUser();
-    const canSee = isBoardOrAdmin(current);
-    if (!canSee) {
-      if (badge) {
-        badge.textContent = "";
-        badge.classList.add("hidden");
-      }
-      if (gearDot) gearDot.classList.add("hidden");
-      return;
-    }
+    if (!badge) return;
     const users = loadLocalData(STORAGE_KEYS.users);
     const pendingCount = users.filter(u => !u.approved && u.role !== "superadmin").length;
     if (pendingCount > 0) {
-      if (badge) {
-        badge.textContent = String(pendingCount);
-        badge.classList.remove("hidden");
-      }
+      badge.textContent = String(pendingCount);
+      badge.classList.remove("hidden");
       if (gearDot) gearDot.classList.remove("hidden");
     } else {
-      if (badge) {
-        badge.textContent = "";
-        badge.classList.add("hidden");
-      }
+      badge.textContent = "";
+      badge.classList.add("hidden");
       if (gearDot) gearDot.classList.add("hidden");
     }
   }
