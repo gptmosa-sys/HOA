@@ -1751,6 +1751,7 @@
       <div style="flex:1; min-width:200px;">
         <label>Upload Quotes (Word / PDF, up to 4)</label>
         <input type="file" id="proj-quote" accept=".doc,.docx,.pdf" multiple>
+        <div class="text-small" id="project-quote-size"></div>
         <div class="attachment-section">
           <div class="text-small">Existing Quotes</div>
           <div class="attachment-list hidden" id="project-quote-attachments"></div>
@@ -1759,6 +1760,7 @@
       <div style="flex:1; min-width:200px;">
         <label>Upload Images (up to 5)</label>
         <input type="file" id="proj-image" accept="image/*" multiple>
+        <div class="text-small" id="project-image-size"></div>
         <div class="attachment-section">
           <div class="text-small">Existing Images</div>
           <div class="attachment-list hidden" id="project-image-attachments"></div>
@@ -3626,6 +3628,71 @@
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  }
+
+  // --- Project attachment sizing (quotes/images) ---
+  const MAX_QUOTE_TOTAL_BYTES = 15 * 1024 * 1024;  // 15 MB for all quotes
+  const MAX_IMAGE_TOTAL_BYTES = 15 * 1024 * 1024;  // 15 MB for all images
+
+  function formatBytes(bytes) {
+    if (!Number.isFinite(bytes)) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    let i = 0;
+    let val = bytes;
+    while (val >= 1024 && i < units.length - 1) {
+      val /= 1024;
+      i++;
+    }
+    const decimals = val >= 10 || val % 1 === 0 ? 0 : 1;
+    return val.toFixed(decimals) + " " + units[i];
+  }
+
+  function dataUrlBytes(dataUrl) {
+    if (!dataUrl || typeof dataUrl !== "string") return 0;
+    const commaIndex = dataUrl.indexOf(",");
+    if (commaIndex === -1) return 0;
+    const base64 = dataUrl.slice(commaIndex + 1);
+    return Math.floor((base64.length * 3) / 4);
+  }
+
+  function getProjectAttachmentTotals(quoteFiles = [], imageFiles = []) {
+    const selectedQuoteBytes = quoteFiles.reduce((sum, f) => sum + (f?.size || 0), 0);
+    const selectedImageBytes = imageFiles.reduce((sum, f) => sum + (f?.size || 0), 0);
+    const existingQuoteBytes = (projectEditQuoteAttachments || []).reduce((sum, att) => sum + dataUrlBytes(att.data), 0);
+    const existingImageBytes = (projectEditImageAttachments || []).reduce((sum, att) => sum + dataUrlBytes(att.data), 0);
+    return {
+      selectedQuoteBytes,
+      selectedImageBytes,
+      existingQuoteBytes,
+      existingImageBytes,
+      totalQuotes: selectedQuoteBytes + existingQuoteBytes,
+      totalImages: selectedImageBytes + existingImageBytes
+    };
+  }
+
+  function updateProjectAttachmentSizes() {
+    const quoteInput = document.getElementById("proj-quote");
+    const imgInput = document.getElementById("proj-image");
+    const quoteFiles = quoteInput ? Array.from(quoteInput.files || []) : [];
+    const imageFiles = imgInput ? Array.from(imgInput.files || []) : [];
+    const totals = getProjectAttachmentTotals(quoteFiles, imageFiles);
+
+    const quoteLabel = document.getElementById("project-quote-size");
+    const imageLabel = document.getElementById("project-image-size");
+
+    if (quoteLabel) {
+      quoteLabel.textContent = `Quotes total (selected + existing): ${formatBytes(totals.totalQuotes)} / 15 MB`;
+      const over = totals.totalQuotes > MAX_QUOTE_TOTAL_BYTES;
+      quoteLabel.style.color = over ? "#b23c17" : "inherit";
+      quoteLabel.style.fontWeight = over ? "600" : "400";
+    }
+    if (imageLabel) {
+      imageLabel.textContent = `Images total (selected + existing): ${formatBytes(totals.totalImages)} / 15 MB`;
+      const over = totals.totalImages > MAX_IMAGE_TOTAL_BYTES;
+      imageLabel.style.color = over ? "#b23c17" : "inherit";
+      imageLabel.style.fontWeight = over ? "600" : "400";
+    }
+    return totals;
   }
 
   function clearProjectFileObjectUrls() {
@@ -5907,6 +5974,7 @@
         imageList.innerHTML = "";
       }
     }
+    updateProjectAttachmentSizes();
   }
 
   function removeProjectAttachment(kind, index) {
@@ -5916,6 +5984,7 @@
       projectEditImageAttachments.splice(index, 1);
     }
     updateProjectAttachmentDisplays();
+    updateProjectAttachmentSizes();
   }
 
   function applyProjectAttachmentEdits(project) {
@@ -5957,6 +6026,7 @@
     projectEditQuoteAttachments = [];
     projectEditImageAttachments = [];
     updateProjectAttachmentDisplays();
+    updateProjectAttachmentSizes();
     const saveBtn = document.getElementById("proj-save-btn");
     if (saveBtn) saveBtn.textContent = "Add Project";
     const cancelBtn = document.getElementById("proj-cancel-btn");
@@ -6672,6 +6742,13 @@
   }
 
   window.addEventListener("beforeunload", clearProjectFileObjectUrls);
+  window.addEventListener("load", () => {
+    const quoteInput = document.getElementById("proj-quote");
+    const imgInput = document.getElementById("proj-image");
+    if (quoteInput) quoteInput.addEventListener("change", updateProjectAttachmentSizes);
+    if (imgInput) imgInput.addEventListener("change", updateProjectAttachmentSizes);
+    updateProjectAttachmentSizes();
+  });
 
   function setStorageMode(_mode) {
     // Storage mode indicator removed (was only for testing); keep stub to avoid errors.
