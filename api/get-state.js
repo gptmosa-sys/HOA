@@ -2,7 +2,8 @@ import { get } from '@vercel/blob';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-const useFile = process.env.PERSIST_MODE === 'file';
+// Default to local file reads unless explicitly forced to blob
+const useFile = process.env.PERSIST_MODE !== 'blob';
 const FILE_PATH = path.join(process.cwd(), 'data.json');
 const BLOB_KEY = 'hoa-state.json';
 
@@ -31,6 +32,16 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
   } catch (error) {
     console.error(error);
+    // Fallback: if blob fails, attempt local file
+    if (!useFile) {
+      try {
+        const data = await readFromFile();
+        res.setHeader('X-Persist-Mode', 'file');
+        return res.status(200).json(data);
+      } catch (fallbackErr) {
+        console.error('File fallback failed', fallbackErr);
+      }
+    }
     return res.status(404).json({ error: 'No state found' });
   }
 }
