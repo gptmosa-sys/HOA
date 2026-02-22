@@ -20,6 +20,11 @@ async function saveToFile(data) {
 }
 
 async function saveToBlob(data) {
+  console.log('save.js: Attempting Blob put for key=' + BLOB_KEY);
+  console.log('save.js: VERCEL=' + process.env.VERCEL);
+  console.log('save.js: PERSIST_MODE=' + process.env.PERSIST_MODE);
+  console.log('save.js: BLOB_READ_WRITE_TOKEN exists? ' + !!process.env.BLOB_READ_WRITE_TOKEN);
+  console.log('save.js: Token length: ' + (process.env.BLOB_READ_WRITE_TOKEN ? process.env.BLOB_READ_WRITE_TOKEN.length : 'missing'));
   const { url } = await put(BLOB_KEY, JSON.stringify(data), {
     access: 'public',
     addRandomSuffix: false,

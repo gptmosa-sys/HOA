@@ -20,6 +20,11 @@ async function readFromFile() {
 }
 
 async function readFromBlob() {
+  console.log('get-state.js: Attempting Blob get for key=' + BLOB_KEY);
+  console.log('get-state.js: VERCEL=' + process.env.VERCEL);
+  console.log('get-state.js: PERSIST_MODE=' + process.env.PERSIST_MODE);
+  console.log('get-state.js: BLOB_READ_WRITE_TOKEN exists? ' + !!process.env.BLOB_READ_WRITE_TOKEN);
+  console.log('get-state.js: Token length: ' + (process.env.BLOB_READ_WRITE_TOKEN ? process.env.BLOB_READ_WRITE_TOKEN.length : 'missing'));
   const { url } = await get(BLOB_KEY, {
     token: process.env.BLOB_READ_WRITE_TOKEN
   });
@@ -57,12 +62,32 @@ export default async function handler(req, res) {
         console.error('File fallback failed', fallbackErr);
       }
     }
-    return res.status(404).json({
-      error: 'No state found',
-      detail: error?.message || 'unknown',
-      tried: preferBlob ? 'blob' : 'file',
-      filePath: FILE_PATH,
-      blobKey: BLOB_KEY
-    });
+    // As a last resort, seed an empty state so the app can start cleanly.
+    const emptyState = {
+      users: [],
+      dues: [],
+      projects: [],
+      documents: [],
+      meetings: [],
+      votes: [],
+      financials: [],
+      timestamp: new Date().toISOString()
+    };
+    try {
+      await fs.writeFile(FILE_PATH, JSON.stringify(emptyState, null, 2), 'utf8');
+      logDebug('seeded-empty-state', { filePath: FILE_PATH });
+      res.setHeader('X-Persist-Mode', 'file');
+      return res.status(200).json(emptyState);
+    } catch (seedErr) {
+      console.error('Failed to seed empty state', seedErr);
+      return res.status(500).json({
+        error: 'No state found and seeding failed',
+        detail: error?.message || 'unknown',
+        seedError: seedErr?.message || 'unknown',
+        tried: preferBlob ? 'blob' : 'file',
+        filePath: FILE_PATH,
+        blobKey: BLOB_KEY
+      });
+    }
   }
 }

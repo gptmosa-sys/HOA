@@ -2084,6 +2084,8 @@
       console.log("Saved to Vercel Blob successfully");
     } catch (err) {
       console.error("Blob save error:", err);
+      console.log('Blob save fallback: full error:', err);
+      console.log('Blob save fallback: status code:', err.status || 'unknown');
       localStorage.setItem("hoa-state", JSON.stringify(fullState));
     }
   }
@@ -2117,6 +2119,8 @@
       console.log("Loaded shared data from Vercel Blob");
     } catch (err) {
       console.warn("Blob load failed → falling back to localStorage", err);
+      console.log('Blob load fallback: full error:', err);
+      console.log('Blob load fallback: status code:', err.status || 'unknown');
       const saved = localStorage.getItem("hoa-state");
       if (saved) {
         const parsed = JSON.parse(saved);
