@@ -4928,7 +4928,7 @@
   function updateIdeaAttachmentDisplay() {
     const list = document.getElementById("idea-attachment-list");
     if (!list) return;
-    if (ideaEditId && ideaEditAttachments.length) {
+    if (ideaEditAttachments.length) {
       list.classList.remove("hidden");
       list.innerHTML = ideaEditAttachments.map((att, idx) => {
         const label = escapeHtml(att.name || ("File " + (idx + 1)));
@@ -4991,16 +4991,15 @@
       alert("You can upload up to five attachments.");
       return;
     }
-    const readFiles = () => Promise.all(files.map(file => new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve({
+    const uploadFiles = () => Promise.all(files.map(file => uploadBlobFile(file, "ideas")
+      .then(uploaded => ({
         name: file.name,
         type: file.type || "application/octet-stream",
-        data: reader.result
-      });
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    })));
+        url: uploaded.url,
+        size: Number.isFinite(uploaded.size) ? uploaded.size : file.size,
+        data: null
+      }))
+    ));
     const finalize = newFiles => {
       let ideas = loadLocalData(STORAGE_KEYS.ideas);
       const isEditing = !!ideaEditId;
@@ -5049,7 +5048,13 @@
       resetIdeaForm();
       renderIdeas();
     };
-    readFiles().then(finalize).catch(() => alert("Unable to read attachment(s). Please try again."));
+    if (!files.length) {
+      finalize([]);
+      return;
+    }
+    uploadFiles()
+      .then(finalize)
+      .catch(() => alert("Unable to upload attachment(s). Please try again."));
   }
 
   function renderIdeas() {
@@ -5088,9 +5093,11 @@
       html += "<td>" + date + "</td>";
       html += "<td>" + escapeHtml(i.costEstimate || "N/A") + "</td>";
       const fileButtons = (i.attachments || []).map((file, index) => {
-        if (!file || !file.data) return "";
+        if (!file || (!file.data && !file.url)) return "";
         const downloadName = escapeAttr(file.name || ("idea_file_" + (index + 1)));
-        return `<a class="ghost-btn tiny" href="${file.data}" download="${downloadName}">File ${index + 1}</a>`;
+        const href = file.url || file.data;
+        const extra = file.url ? " target=\"_blank\" rel=\"noopener\"" : "";
+        return `<a class="ghost-btn tiny" href="${href}" download="${downloadName}"${extra}>File ${index + 1}</a>`;
       }).filter(Boolean);
       html += "<td>" + (fileButtons.length ? fileButtons.join(" ") : "—") + "</td>";
       const votes = i.votes || {};
@@ -5142,7 +5149,9 @@
     ideaEditAttachments = (idea.attachments || []).map(att => ({
       name: att.name || "File",
       type: att.type || "application/octet-stream",
-      data: att.data || null
+      data: att.data || null,
+      url: att.url || null,
+      size: att.size || null
     }));
     updateIdeaAttachmentDisplay();
     if (submitBtn) submitBtn.textContent = "Update Idea";
