@@ -2490,7 +2490,7 @@
     residentLotSelectInitialized = true;
   }
 
-  function handleLogin() {
+  async function handleLogin() {
     const emailInput = document.getElementById("login-email");
     const passwordInput = document.getElementById("login-password");
     const email = (emailInput.value || "").trim().toLowerCase();
@@ -2498,6 +2498,18 @@
     if (!email || !password) {
       alert("Enter your email and password.");
       return;
+    }
+    beginActivity("Checking account…");
+    try {
+      const res = await fetch("/api/get-state", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        applyRemoteData(data, res.headers.get("x-persist-mode") || "blob");
+      }
+    } catch (err) {
+      console.warn("Login refresh failed; using cached data", err);
+    } finally {
+      endActivity();
     }
     const users = loadLocalData(STORAGE_KEYS.users);
     const user = users.find(u => (u.email || "").toLowerCase() === email);
