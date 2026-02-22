@@ -1,59 +1,25 @@
-import { get, list } from "@vercel/blob";
-
-export const config = { runtime: "nodejs" };
-
-const BLOB_PATH = "hoa-state.json";
-
-const emptyState = {
-  users: [],
-  dues: [],
-  projects: [],
-  documents: [],
-  meetings: [],
-  minutes: [],
-  ideas: [],
-  votes: [],
-  financials: [],
-  residentDocuments: [],
-  duesAmounts: [],
-  balanceOverrides: [],
-  actionLog: [],
-  timestamp: null
-};
+import { get } from '@vercel/blob';
 
 export default async function handler(req, res) {
-  if (req.method !== "GET") {
-    res.status(405).send("Method Not Allowed");
-    return;
-  }
-
-  try {
-    const { blobs } = await list({ prefix: BLOB_PATH });
-    const existing = blobs.find(b => b.pathname === BLOB_PATH);
-
-    if (!existing) {
-      res
-        .status(200)
-        .setHeader("content-type", "application/json")
-        .setHeader("cache-control", "no-store")
-        .setHeader("x-persist-mode", "blob")
-        .setHeader("x-blob-version", "")
-        .send(JSON.stringify(emptyState));
-      return;
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { body, contentType } = await get(existing.url);
-    const text = await new Response(body).text();
+  const key = 'hoa-state.json';
 
-    res
-      .status(200)
-      .setHeader("content-type", contentType || "application/json")
-      .setHeader("cache-control", "no-store")
-      .setHeader("x-persist-mode", "blob")
-      .setHeader("x-blob-version", existing.etag || "")
-      .send(text);
-  } catch (err) {
-    console.error("get-state error", err);
-    res.status(err?.status || 500).send("Failed to load state");
+  try {
+    const { url } = await get(key, {
+      token: process.env.BLOB_READ_WRITE_TOKEN
+    });
+
+    const blobRes = await fetch(url);
+    if (!blobRes.ok) throw new Error('Blob fetch failed');
+
+    const data = await blobRes.json();
+
+    return res.status(200).json(data);
+  } catch (error) {
+    console.error(error);
+    return res.status(404).json({ error: 'No state found in Blob' });
   }
 }

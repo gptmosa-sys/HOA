@@ -2056,66 +2056,54 @@
       projects,
       documents,
       meetings,
-      minutes,
-      ideas,
       votes,
       financials,
-      residentDocuments,
-      duesAmounts,
-      balanceOverrides,
-      actionLog,
       timestamp: new Date().toISOString()
     };
 
     try {
-      const headers = { "Content-Type": "application/json" };
-      if (blobVersion) headers["If-Match"] = blobVersion;
-
-      const res = await fetch("/api/save", {
-        method: "POST",
-        headers,
+      const res = await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data: fullState })
       });
 
-      if (res.status === 412) {
-        console.warn("Blob version conflict; reloading latest state");
-        await loadData();
-        alert("Someone else saved changes a moment ago. Refreshed to the latest version. Please re-apply your change.");
-        return;
-      }
-
-      if (!res.ok) throw new Error("Save failed: " + res.status);
-
-      blobVersion = res.headers.get("x-blob-version") || res.headers.get("etag") || blobVersion;
-      setStorageMode(res.headers.get("x-persist-mode") || "blob");
-      console.log("Saved to Vercel Blob successfully");
+      if (!res.ok) throw new Error('Save failed: ' + res.status);
+      console.log('Saved to Vercel Blob successfully');
     } catch (err) {
-      console.error("Blob save error:", err);
-      console.log('Blob save fallback: full error:', err);
-      console.log('Blob save fallback: status code:', err.status || 'unknown');
-      localStorage.setItem("hoa-state", JSON.stringify(fullState));
-      setStorageMode("offline/local (save failed)");
+      console.error('Blob save error:', err);
+      localStorage.setItem('hoa-state', JSON.stringify(fullState));
     }
   }
 
   async function loadData() {
     try {
-      const res = await fetch("/api/get-state", { cache: "no-store" });
-      if (!res.ok) throw new Error("No state in Blob: " + res.status);
+      const res = await fetch('/api/get-state');
+      if (!res.ok) throw new Error('No state in Blob: ' + res.status);
       const data = await res.json();
-      blobVersion = res.headers.get("x-blob-version") || res.headers.get("etag") || null;
-      applyRemoteData(data, res.headers.get("x-persist-mode") || "blob");
-      console.log("Loaded shared data from Vercel Blob");
+
+      users      = data.users      || [];
+      dues       = data.dues       || [];
+      projects   = data.projects   || [];
+      documents  = data.documents  || [];
+      meetings   = data.meetings   || [];
+      votes      = data.votes      || [];
+      financials = data.financials || [];
+
+      console.log('Loaded shared data from Vercel Blob');
     } catch (err) {
-      console.warn("Blob load failed → falling back to localStorage", err);
-      console.log('Blob load fallback: full error:', err);
-      console.log('Blob load fallback: status code:', err.status || 'unknown');
-      const saved = localStorage.getItem("hoa-state");
+      console.warn('Blob load failed → falling back to localStorage', err);
+      const saved = localStorage.getItem('hoa-state');
       if (saved) {
-        applyRemoteData(JSON.parse(saved), "offline/local");
+        const parsed = JSON.parse(saved);
+        users      = parsed.users      || [];
+        dues       = parsed.dues       || [];
+        projects   = parsed.projects   || [];
+        documents  = parsed.documents  || [];
+        meetings   = parsed.meetings   || [];
+        votes      = parsed.votes      || [];
+        financials = parsed.financials || [];
       }
-      sharedStateLoaded = true;
-      setStorageMode("offline/local");
     }
 
     renderDashboard();
