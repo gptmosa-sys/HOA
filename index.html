@@ -9,7 +9,21 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
-  <style>
+<style>
+  .storage-mode-banner {
+    position: fixed;
+    bottom: 12px;
+    right: 12px;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+    z-index: 9999;
+    opacity: 0.9;
+  }
+  .storage-mode-banner.hidden { display: none; }
     :root {
       --ink: #1f3141;
       --ink-muted: rgba(31, 49, 65, 0.7);
@@ -2030,6 +2044,7 @@
       });
 
       if (!res.ok) throw new Error("Save failed: " + res.status);
+      setStorageMode(res.headers.get("x-persist-mode") || "blob");
       console.log("Saved to Vercel Blob successfully");
     } catch (err) {
       console.error("Blob save error:", err);
@@ -2042,6 +2057,7 @@
       const res = await fetch("/api/get-state");
       if (!res.ok) throw new Error("No state in Blob: " + res.status);
       const data = await res.json();
+      setStorageMode(res.headers.get("x-persist-mode") || "blob");
 
       users      = data.users      || [];
       dues       = data.dues       || [];
@@ -2077,6 +2093,7 @@
         financials = parsed.financials || [];
       }
       sharedStateLoaded = true;
+      setStorageMode("offline/local");
     }
 
     renderDashboard();
@@ -6543,6 +6560,15 @@
 
   window.addEventListener("beforeunload", clearProjectFileObjectUrls);
 
+  const storageModeEl = document.getElementById("storage-mode-indicator");
+
+  function setStorageMode(mode) {
+    if (!storageModeEl) return;
+    const label = (mode || "").toLowerCase();
+    storageModeEl.textContent = "Storage mode: " + (label || "unknown");
+    storageModeEl.classList.remove("hidden");
+  }
+
   window.onload = async function() {
     await loadData();
     initSuperAdmin();
@@ -6556,6 +6582,7 @@
   };
 </script>
 
+<div id="storage-mode-indicator" class="storage-mode-banner hidden">Storage mode: …</div>
 <div class="scroll-initials">Re</div>
 
 </body>
