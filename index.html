@@ -2300,6 +2300,7 @@
       const data = await res.json();
       blobVersion = res.headers.get("x-blob-version") || res.headers.get("etag") || blobVersion;
       applyRemoteData(data, res.headers.get("x-persist-mode") || "blob");
+      updatePendingUsersBadge();
       renderSectionById(id);
     } catch (err) {
       console.warn("Section refresh failed; using cached data", err);
@@ -6840,16 +6841,29 @@
   function updatePendingUsersBadge() {
     const badge = document.getElementById("pending-users-badge");
     const gearDot = document.getElementById("settings-alert-dot");
-    if (!badge) return;
+    const current = getFullCurrentUser();
+    const canSee = isBoardOrAdmin(current);
+    if (!canSee) {
+      if (badge) {
+        badge.textContent = "";
+        badge.classList.add("hidden");
+      }
+      if (gearDot) gearDot.classList.add("hidden");
+      return;
+    }
     const users = loadLocalData(STORAGE_KEYS.users);
     const pendingCount = users.filter(u => !u.approved && u.role !== "superadmin").length;
     if (pendingCount > 0) {
-      badge.textContent = String(pendingCount);
-      badge.classList.remove("hidden");
+      if (badge) {
+        badge.textContent = String(pendingCount);
+        badge.classList.remove("hidden");
+      }
       if (gearDot) gearDot.classList.remove("hidden");
     } else {
-      badge.textContent = "";
-      badge.classList.add("hidden");
+      if (badge) {
+        badge.textContent = "";
+        badge.classList.add("hidden");
+      }
       if (gearDot) gearDot.classList.add("hidden");
     }
   }
