@@ -1,4 +1,4 @@
-import { get } from '@vercel/blob';
+import { head } from '@vercel/blob';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -25,10 +25,12 @@ async function readFromBlob() {
   console.log('get-state.js: PERSIST_MODE=' + process.env.PERSIST_MODE);
   console.log('get-state.js: BLOB_READ_WRITE_TOKEN exists? ' + !!process.env.BLOB_READ_WRITE_TOKEN);
   console.log('get-state.js: Token length: ' + (process.env.BLOB_READ_WRITE_TOKEN ? process.env.BLOB_READ_WRITE_TOKEN.length : 'missing'));
-  const { url } = await get(BLOB_KEY, {
+  const meta = await head(BLOB_KEY, {
     token: process.env.BLOB_READ_WRITE_TOKEN
   });
-  const blobRes = await fetch(url);
+  const blobRes = await fetch(meta.downloadUrl, {
+    headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` }
+  });
   if (!blobRes.ok) throw new Error('Blob fetch failed');
   return await blobRes.json();
 }
@@ -91,3 +93,8 @@ export default async function handler(req, res) {
     }
   }
 }
+
+// Ensure Node runtime (not Edge) so filesystem access works for fallbacks/seeding.
+export const config = {
+  runtime: 'nodejs18.x'
+};

@@ -26,7 +26,7 @@ async function saveToBlob(data) {
   console.log('save.js: BLOB_READ_WRITE_TOKEN exists? ' + !!process.env.BLOB_READ_WRITE_TOKEN);
   console.log('save.js: Token length: ' + (process.env.BLOB_READ_WRITE_TOKEN ? process.env.BLOB_READ_WRITE_TOKEN.length : 'missing'));
   const { url } = await put(BLOB_KEY, JSON.stringify(data), {
-    access: 'public',
+    access: 'private',
     addRandomSuffix: false,
     token: process.env.BLOB_READ_WRITE_TOKEN
   });
@@ -76,3 +76,8 @@ export default async function handler(req, res) {
     });
   }
 }
+
+// Ensure Node runtime (not Edge) so filesystem fallback works.
+export const config = {
+  runtime: 'nodejs18.x'
+};
