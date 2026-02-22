@@ -3658,8 +3658,14 @@
   function getProjectAttachmentTotals(quoteFiles = [], imageFiles = []) {
     const selectedQuoteBytes = quoteFiles.reduce((sum, f) => sum + (f?.size || 0), 0);
     const selectedImageBytes = imageFiles.reduce((sum, f) => sum + (f?.size || 0), 0);
-    const existingQuoteBytes = (projectEditQuoteAttachments || []).reduce((sum, att) => sum + dataUrlBytes(att.data), 0);
-    const existingImageBytes = (projectEditImageAttachments || []).reduce((sum, att) => sum + dataUrlBytes(att.data), 0);
+    const existingQuoteBytes = (projectEditQuoteAttachments || []).reduce(
+      (sum, att) => sum + (Number.isFinite(att.size) ? att.size : dataUrlBytes(att.data)),
+      0
+    );
+    const existingImageBytes = (projectEditImageAttachments || []).reduce(
+      (sum, att) => sum + (Number.isFinite(att.size) ? att.size : dataUrlBytes(att.data)),
+      0
+    );
     return {
       selectedQuoteBytes,
       selectedImageBytes,
@@ -3695,6 +3701,22 @@
     return totals;
   }
 
+  async function uploadProjectFile(file) {
+    const res = await fetch("/api/upload-project-file", {
+      method: "POST",
+      headers: {
+        "x-file-name": encodeURIComponent(file.name),
+        "content-type": file.type || "application/octet-stream"
+      },
+      body: file
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error("Upload failed: " + res.status + " " + text);
+    }
+    return res.json();
+  }
+
   async function handleProjectFileChange(kind) {
     const quoteInput = document.getElementById("proj-quote");
     const imgInput = document.getElementById("proj-image");
@@ -3715,18 +3737,38 @@
       return;
     }
 
-    if (kind === "quote" && quoteInput) {
-      const newAtt = await readFilesAsDataUrls(quoteInput.files);
-      projectEditQuoteAttachments = projectEditQuoteAttachments.concat(newAtt);
-      quoteInput.value = ""; // clear selection so re-adding same file works
+    try {
+      if (kind === "quote" && quoteInput) {
+        const uploads = await Promise.all(quoteFiles.map(uploadProjectFile));
+        const newAtt = uploads.map((uploaded, idx) => ({
+          name: quoteFiles[idx].name,
+          url: uploaded.url,
+          size: Number.isFinite(uploaded.size) ? uploaded.size : (quoteFiles[idx].size || null),
+          contentType: uploaded.contentType || quoteFiles[idx].type || "application/octet-stream"
+        }));
+        projectEditQuoteAttachments = projectEditQuoteAttachments.concat(newAtt);
+        quoteInput.value = "";
+      }
+      if (kind === "image" && imgInput) {
+        const uploads = await Promise.all(imageFiles.map(uploadProjectFile));
+        const newAtt = uploads.map((uploaded, idx) => ({
+          name: imageFiles[idx].name,
+          url: uploaded.url,
+          size: Number.isFinite(uploaded.size) ? uploaded.size : (imageFiles[idx].size || null),
+          contentType: uploaded.contentType || imageFiles[idx].type || "application/octet-stream"
+        }));
+        projectEditImageAttachments = projectEditImageAttachments.concat(newAtt);
+        imgInput.value = "";
+      }
+    } catch (err) {
+      console.error("Project file upload failed:", err);
+      alert("Unable to upload attachments. Please try again.");
+      if (kind === "quote" && quoteInput) quoteInput.value = "";
+      if (kind === "image" && imgInput) imgInput.value = "";
+    } finally {
+      updateProjectAttachmentDisplays();
+      updateProjectAttachmentSizes();
     }
-    if (kind === "image" && imgInput) {
-      const newAtt = await readFilesAsDataUrls(imgInput.files);
-      projectEditImageAttachments = projectEditImageAttachments.concat(newAtt);
-      imgInput.value = "";
-    }
-    updateProjectAttachmentDisplays();
-    updateProjectAttachmentSizes();
   }
 
   function clearProjectFileObjectUrls() {
@@ -5984,7 +6026,7 @@
   function updateProjectAttachmentDisplays() {
     const quoteList = document.getElementById("project-quote-attachments");
     if (quoteList) {
-      if (projectEditId && projectEditQuoteAttachments.length) {
+      if (projectEditQuoteAttachments.length) {
         quoteList.classList.remove("hidden");
         quoteList.innerHTML = projectEditQuoteAttachments.map((att, idx) => {
           const label = escapeHtml(att.name || ("Quote " + (idx + 1)));
@@ -5997,7 +6039,7 @@
     }
     const imageList = document.getElementById("project-image-attachments");
     if (imageList) {
-      if (projectEditId && projectEditImageAttachments.length) {
+      if (projectEditImageAttachments.length) {
         imageList.classList.remove("hidden");
         imageList.innerHTML = projectEditImageAttachments.map((att, idx) => {
           const label = escapeHtml(att.name || ("Image " + (idx + 1)));
@@ -6024,21 +6066,33 @@
   function applyProjectAttachmentEdits(project) {
     const quotesClone = projectEditQuoteAttachments.map(att => ({
       name: att.name || "Quote",
-      data: att.data || null
+      data: att.url ? null : (att.data || null),
+      url: att.url || null,
+      size: att.size || null,
+      contentType: att.contentType || null
     }));
     project.quotes = quotesClone;
     const primaryQuote = quotesClone[0] || null;
     project.quoteName = primaryQuote ? primaryQuote.name : "";
     project.quoteData = primaryQuote ? primaryQuote.data : null;
+    project.quoteUrl = primaryQuote ? primaryQuote.url : null;
+    project.quoteSize = primaryQuote ? primaryQuote.size : null;
+    project.quoteType = primaryQuote ? primaryQuote.contentType : null;
 
     const imagesClone = projectEditImageAttachments.map(att => ({
       name: att.name || "Image",
-      data: att.data || null
+      data: att.url ? null : (att.data || null),
+      url: att.url || null,
+      size: att.size || null,
+      contentType: att.contentType || null
     }));
     project.images = imagesClone;
     const primaryImage = imagesClone[0] || null;
     project.imgName = primaryImage ? primaryImage.name : "";
     project.imgData = primaryImage ? primaryImage.data : null;
+    project.imgUrl = primaryImage ? primaryImage.url : null;
+    project.imgSize = primaryImage ? primaryImage.size : null;
+    project.imgType = primaryImage ? primaryImage.contentType : null;
   }
 
   function resetProjectForm() {
@@ -6088,19 +6142,24 @@
     const category = document.getElementById("proj-category").value;
     const cost = parseFloat(document.getElementById("proj-cost").value);
     const plannedCost = parseFloat(document.getElementById("proj-planned").value);
-    const quoteInput = document.getElementById("proj-quote");
-    const imgInput = document.getElementById("proj-image");
     const notes = document.getElementById("proj-notes").value.trim();
-    const quoteFiles = quoteInput ? Array.from(quoteInput.files || []) : [];
-    const imageFiles = imgInput ? Array.from(imgInput.files || []) : [];
-    const existingQuoteCount = projectEditId ? projectEditQuoteAttachments.length : 0;
-    const existingImageCount = projectEditId ? projectEditImageAttachments.length : 0;
-    if (quoteFiles.length + existingQuoteCount > 4) {
+    const quoteCount = projectEditQuoteAttachments.length;
+    const imageCount = projectEditImageAttachments.length;
+    if (quoteCount > 4) {
       alert("You can upload up to four quotes per project.");
       return;
     }
-    if (imageFiles.length + existingImageCount > 5) {
+    if (imageCount > 5) {
       alert("You can upload up to five images per project.");
+      return;
+    }
+    const totals = getProjectAttachmentTotals([], []);
+    if (totals.totalQuotes > MAX_QUOTE_TOTAL_BYTES) {
+      alert(`Quotes exceed 15 MB (now ${formatBytes(totals.totalQuotes)}). Remove or choose smaller files.`);
+      return;
+    }
+    if (totals.totalImages > MAX_IMAGE_TOTAL_BYTES) {
+      alert(`Images exceed 15 MB (now ${formatBytes(totals.totalImages)}). Remove or choose smaller files.`);
       return;
     }
     if (!name || !Number.isFinite(year) || Number.isNaN(cost)) {
@@ -6124,83 +6183,33 @@
       project.cost = cost;
       project.notes = notes;
       project.plannedCost = normalizedPlannedCost;
-      const filePromises = [];
-      quoteFiles.forEach(file => filePromises.push(readFileAsDataUrl(file)));
-      imageFiles.forEach(file => filePromises.push(readFileAsDataUrl(file)));
-
-      const finalizeEdit = () => {
-        applyProjectAttachmentEdits(project);
-        project.updatedAt = new Date().toISOString();
-        saveLocalData(STORAGE_KEYS.projects, projects);
-        resetProjectForm();
-        renderProjects();
-        renderFinancials();
-      };
-
-      if (filePromises.length) {
-        Promise.all(filePromises).then(results => {
-          let resultIndex = 0;
-          if (quoteFiles.length) {
-            const newQuotes = quoteFiles.map(file => ({
-              name: file.name,
-              data: results[resultIndex++] || null
-            }));
-            projectEditQuoteAttachments = projectEditQuoteAttachments.concat(newQuotes);
-          }
-          if (imageFiles.length) {
-            const newImages = imageFiles.map(file => ({
-              name: file.name,
-              data: results[resultIndex++] || null
-            }));
-            projectEditImageAttachments = projectEditImageAttachments.concat(newImages);
-          }
-          updateProjectAttachmentDisplays();
-          finalizeEdit();
-        }).catch(() => alert("Unable to read attachments. Please try again."));
-        return;
-      }
-      finalizeEdit();
+      applyProjectAttachmentEdits(project);
+      project.updatedAt = new Date().toISOString();
+      saveLocalData(STORAGE_KEYS.projects, projects);
+      resetProjectForm();
+      renderProjects();
+      renderFinancials();
       return;
     } else {
-      const filesToRead = [];
-      quoteFiles.forEach(file => filesToRead.push(readFileAsDataUrl(file)));
-      imageFiles.forEach(file => filesToRead.push(readFileAsDataUrl(file)));
-      Promise.all(filesToRead).then(results => {
-        let resultIndex = 0;
-        const quotes = quoteFiles.map(file => ({
-          name: file.name,
-          data: results[resultIndex++] || null
-        }));
-        const primaryQuote = quotes[0] || null;
-        const images = imageFiles.map(file => ({
-          name: file.name,
-          data: results[resultIndex++] || null
-        }));
-        const primaryImage = images[0] || null;
-        projects.push({
-          id: "proj_" + Date.now(),
-          name,
-          year,
-          type,
-          category,
-          cost,
-          quotes,
-          quoteName: primaryQuote ? primaryQuote.name : "",
-          quoteData: primaryQuote ? primaryQuote.data : null,
-          images,
-          imgName: primaryImage ? primaryImage.name : "",
-          imgData: primaryImage ? primaryImage.data : null,
-          notes,
-          plannedCost: normalizedPlannedCost,
-          paid: false,
-          actualCost: null,
-          createdAt: new Date().toISOString()
-        });
-        saveLocalData(STORAGE_KEYS.projects, projects);
-        resetProjectForm();
-        renderProjects();
-        renderFinancials();
-      }).catch(() => alert("Unable to read attachments. Please try again."));
+      const project = {
+        id: "proj_" + Date.now(),
+        name,
+        year,
+        type,
+        category,
+        cost,
+        notes,
+        plannedCost: normalizedPlannedCost,
+        paid: false,
+        actualCost: null,
+        createdAt: new Date().toISOString()
+      };
+      applyProjectAttachmentEdits(project);
+      projects.push(project);
+      saveLocalData(STORAGE_KEYS.projects, projects);
+      resetProjectForm();
+      renderProjects();
+      renderFinancials();
       return;
     }
   }
@@ -6302,12 +6311,18 @@
     if (Array.isArray(project.quotes) && project.quotes.length) {
       projectEditQuoteAttachments = project.quotes.map(att => ({
         name: att.name || "Quote",
-        data: att.data || null
+        data: att.data || null,
+        url: att.url || null,
+        size: att.size || null,
+        contentType: att.contentType || null
       }));
     } else if (project.quoteName || project.quoteData) {
       projectEditQuoteAttachments = [{
         name: project.quoteName || "Quote",
-        data: project.quoteData || null
+        data: project.quoteData || null,
+        url: project.quoteUrl || null,
+        size: project.quoteSize || null,
+        contentType: project.quoteType || null
       }];
     } else {
       projectEditQuoteAttachments = [];
@@ -6315,12 +6330,18 @@
     if (Array.isArray(project.images) && project.images.length) {
       projectEditImageAttachments = project.images.map(att => ({
         name: att.name || "Image",
-        data: att.data || null
+        data: att.data || null,
+        url: att.url || null,
+        size: att.size || null,
+        contentType: att.contentType || null
       }));
     } else if (project.imgName || project.imgData) {
       projectEditImageAttachments = [{
         name: project.imgName || "Image",
-        data: project.imgData || null
+        data: project.imgData || null,
+        url: project.imgUrl || null,
+        size: project.imgSize || null,
+        contentType: project.imgType || null
       }];
     } else {
       projectEditImageAttachments = [];
@@ -6419,6 +6440,17 @@
         };
       }
       if (quoteEntry) {
+        if (quoteEntry.url) {
+          const link = document.createElement("a");
+          link.href = quoteEntry.url;
+          link.download = quoteEntry.name || fallbackName;
+          link.target = "_blank";
+          link.rel = "noopener";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          return;
+        }
         data = quoteEntry.data || null;
         fileName = quoteEntry.name || fallbackName;
       } else {
@@ -6439,6 +6471,17 @@
         };
       }
       if (imageEntry) {
+        if (imageEntry.url) {
+          const link = document.createElement("a");
+          link.href = imageEntry.url;
+          link.download = imageEntry.name || fallbackName;
+          link.target = "_blank";
+          link.rel = "noopener";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          return;
+        }
         data = imageEntry.data || null;
         fileName = imageEntry.name || fallbackName;
       } else {
