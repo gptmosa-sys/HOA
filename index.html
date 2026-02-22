@@ -3655,8 +3655,7 @@
   const MAX_PROJECT_ATTACHMENT_BYTES = 3 * 1024 * 1024; // 3MB per file
   const MAX_PROJECT_IMAGE_BYTES = 15 * 1024 * 1024; // 15MB total images (selected + existing)
   const MAX_PROJECT_QUOTE_BYTES = 15 * 1024 * 1024; // 15MB total quotes (selected + existing)
-  const MAX_PROJECT_TOTAL_BYTES = 30 * 1024 * 1024; // 30MB combined images+quotes
-  const MAX_SAVE_BYTES = 30 * 1024 * 1024; // overall payload guard (~30MB)
+  const MAX_SAVE_BYTES = 25 * 1024 * 1024; // overall payload guard (~25MB)
 
   function validateProjectFiles(quoteFiles, imageFiles) {
     for (const f of quoteFiles) {
@@ -3678,10 +3677,6 @@
     }
     if (sizes.totalImages > MAX_PROJECT_IMAGE_BYTES) {
       alert(`Images exceed the 15 MB limit (current total: ${formatBytes(sizes.totalImages)}). Remove or shrink files.`);
-      return false;
-    }
-    if (sizes.total > MAX_PROJECT_TOTAL_BYTES) {
-      alert(`Combined images + quotes exceed the 30 MB limit (current total: ${formatBytes(sizes.total)}). Remove or shrink files.`);
       return false;
     }
     return true;
@@ -3732,20 +3727,6 @@
     const imgInput = document.getElementById("proj-image");
     const quoteFiles = quoteInput ? Array.from(quoteInput.files || []) : [];
     const imageFiles = imgInput ? Array.from(imgInput.files || []) : [];
-
-    const oversizeQuote = quoteFiles.find(f => (f?.size || 0) > MAX_PROJECT_ATTACHMENT_BYTES);
-    if (oversizeQuote) {
-      alert(`Quote "${oversizeQuote.name}" is over the 3 MB limit. Please choose a smaller file.`);
-      if (quoteInput) quoteInput.value = "";
-      return updateProjectAttachmentSizes();
-    }
-    const oversizeImage = imageFiles.find(f => (f?.size || 0) > MAX_PROJECT_ATTACHMENT_BYTES);
-    if (oversizeImage) {
-      alert(`Image "${oversizeImage.name}" is over the 3 MB limit. Please choose a smaller file.`);
-      if (imgInput) imgInput.value = "";
-      return updateProjectAttachmentSizes();
-    }
-
     const sizes = getProjectAttachmentBytes(quoteFiles, imageFiles);
     const quoteLabel = document.getElementById("project-quote-size");
     const imageLabel = document.getElementById("project-image-size");
@@ -3765,8 +3746,8 @@
       imageLabel.style.fontWeight = sizes.totalImages > MAX_PROJECT_IMAGE_BYTES ? "600" : "400";
     }
     if (totalLabel) {
-      const text = `Combined (quotes + images): ${formatBytes(sizes.total)} / 30 MB`;
-      const over = sizes.total > MAX_PROJECT_TOTAL_BYTES || sizes.totalImages > MAX_PROJECT_IMAGE_BYTES || sizes.totalQuotes > MAX_PROJECT_QUOTE_BYTES;
+      const text = `Combined (quotes + images): ${formatBytes(sizes.total)}`;
+      const over = sizes.totalImages > MAX_PROJECT_IMAGE_BYTES || sizes.totalQuotes > MAX_PROJECT_QUOTE_BYTES;
       totalLabel.textContent = text;
       totalLabel.style.color = over ? "#b23c17" : "inherit";
       totalLabel.style.fontWeight = over ? "600" : "400";
