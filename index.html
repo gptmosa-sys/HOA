@@ -1080,42 +1080,12 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      z-index: 3000;
-      pointer-events: auto;
     }
 
     .settings-btn svg {
       width: 22px;
       height: 22px;
       fill: currentColor;
-    }
-
-    .pending-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 18px;
-      height: 18px;
-      padding: 0 6px;
-      margin-left: 8px;
-      border-radius: 999px;
-      background: #c62828;
-      color: #fff;
-      font-size: 0.7rem;
-      font-weight: 600;
-      line-height: 1;
-    }
-
-    .notification-dot {
-      position: absolute;
-      top: -4px;
-      right: -4px;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #c62828;
-      border: 2px solid #fff;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     }
 
     .settings-flyout {
@@ -1875,15 +1845,11 @@
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a6.94 6.94 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 14.9 2h-3.8a.5.5 0 0 0-.49.41l-.36 2.54c-.6.24-1.14.56-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L3.7 8.47a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L3.82 15.15a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.39.32.61.22l2.39-.96c.49.38 1.03.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.41h3.8a.5.5 0 0 0 .49-.41l.36-2.54c.6-.24 1.14-.56 1.63-.94l2.39.96c.23.09.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" fill="currentColor"></path>
       </svg>
-      <span class="notification-dot hidden" id="settings-alert-dot" aria-hidden="true"></span>
     </button>
     <div class="settings-flyout hidden" id="settings-panel">
       <h4>Quick Actions</h4>
       <button class="primary" type="button" onclick="handleLogout()">Logout</button>
-      <button class="primary small" type="button" onclick="openSection('users')">
-        Manage Users
-        <span class="pending-badge hidden" id="pending-users-badge" aria-label="Pending approvals"></span>
-      </button>
+      <button class="primary small" type="button" onclick="openSection('users')">Manage Users</button>
       <button class="primary small hidden" type="button" id="data-admin-btn" onclick="openDataAdminModal()">Export / Import Data</button>
       <button class="ghost-btn small hidden" type="button" id="view-action-log-btn" onclick="toggleActionLog()">View Action Log</button>
     </div>
@@ -2524,7 +2490,7 @@
     residentLotSelectInitialized = true;
   }
 
-  function handleLogin() {
+  async function handleLogin() {
     const emailInput = document.getElementById("login-email");
     const passwordInput = document.getElementById("login-password");
     const email = (emailInput.value || "").trim().toLowerCase();
@@ -2532,6 +2498,18 @@
     if (!email || !password) {
       alert("Enter your email and password.");
       return;
+    }
+    beginActivity("Checking account…");
+    try {
+      const res = await fetch("/api/get-state", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        applyRemoteData(data, res.headers.get("x-persist-mode") || "blob");
+      }
+    } catch (err) {
+      console.warn("Login refresh failed; using cached data", err);
+    } finally {
+      endActivity();
     }
     const users = loadLocalData(STORAGE_KEYS.users);
     const user = users.find(u => (u.email || "").toLowerCase() === email);
