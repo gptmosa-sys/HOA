@@ -1749,6 +1749,7 @@
       <div style="flex:1; min-width:200px;">
         <label>Upload Quotes (Word / PDF, up to 4)</label>
         <input type="file" id="proj-quote" accept=".doc,.docx,.pdf" multiple>
+        <div class="text-small" id="project-quote-size"></div>
         <div class="attachment-section">
           <div class="text-small">Existing Quotes</div>
           <div class="attachment-list hidden" id="project-quote-attachments"></div>
@@ -1757,12 +1758,14 @@
       <div style="flex:1; min-width:200px;">
         <label>Upload Images (up to 5)</label>
         <input type="file" id="proj-image" accept="image/*" multiple>
+        <div class="text-small" id="project-image-size"></div>
         <div class="attachment-section">
           <div class="text-small">Existing Images</div>
           <div class="attachment-list hidden" id="project-image-attachments"></div>
         </div>
       </div>
     </div>
+    <div class="text-small" id="project-attachment-total"></div>
     <label>Notes</label>
     <textarea id="proj-notes"></textarea>
     <div class="flex-row project-actions">
@@ -3649,22 +3652,86 @@
     });
   }
 
-  const MAX_PROJECT_ATTACHMENT_BYTES = 1.5 * 1024 * 1024; // ~1.5MB per file
+  const MAX_PROJECT_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB per file (hard cap)
+  const MAX_PROJECT_TOTAL_BYTES = 10 * 1024 * 1024; // 10MB overall budget per save
 
   function validateProjectFiles(quoteFiles, imageFiles) {
     for (const f of quoteFiles) {
       if (f.size > MAX_PROJECT_ATTACHMENT_BYTES) {
-        alert(`Quote \"${f.name}\" is too large (limit ~1.5MB). Please upload a smaller file.`);
+        alert(`Quote \"${f.name}\" is too large (limit ~10MB). Please upload a smaller file.`);
         return false;
       }
     }
     for (const f of imageFiles) {
       if (f.size > MAX_PROJECT_ATTACHMENT_BYTES) {
-        alert(`Image \"${f.name}\" is too large (limit ~1.5MB). Please upload a smaller file.`);
+        alert(`Image \"${f.name}\" is too large (limit ~10MB). Please upload a smaller file.`);
         return false;
       }
     }
     return true;
+  }
+
+  function formatBytes(bytes) {
+    if (!Number.isFinite(bytes)) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    let i = 0;
+    let val = bytes;
+    while (val >= 1024 && i < units.length - 1) {
+      val /= 1024;
+      i++;
+    }
+    return val.toFixed(val >= 10 || val % 1 === 0 ? 0 : 1) + " " + units[i];
+  }
+
+  function dataUrlBytes(dataUrl) {
+    if (!dataUrl || typeof dataUrl !== "string") return 0;
+    const commaIndex = dataUrl.indexOf(",");
+    if (commaIndex === -1) return 0;
+    const base64 = dataUrl.slice(commaIndex + 1);
+    // Approx bytes from base64 length
+    return Math.floor((base64.length * 3) / 4);
+  }
+
+  function getProjectAttachmentBytes(quoteFiles, imageFiles) {
+    const selectedQuoteBytes = quoteFiles.reduce((sum, f) => sum + (f?.size || 0), 0);
+    const selectedImageBytes = imageFiles.reduce((sum, f) => sum + (f?.size || 0), 0);
+    const existingQuoteBytes = projectEditQuoteAttachments.reduce((sum, att) => sum + dataUrlBytes(att.data), 0);
+    const existingImageBytes = projectEditImageAttachments.reduce((sum, att) => sum + dataUrlBytes(att.data), 0);
+    const total = selectedQuoteBytes + selectedImageBytes + existingQuoteBytes + existingImageBytes;
+    return {
+      selectedQuoteBytes,
+      selectedImageBytes,
+      existingQuoteBytes,
+      existingImageBytes,
+      total
+    };
+  }
+
+  function updateProjectAttachmentSizes() {
+    const quoteInput = document.getElementById("proj-quote");
+    const imgInput = document.getElementById("proj-image");
+    const quoteFiles = quoteInput ? Array.from(quoteInput.files || []) : [];
+    const imageFiles = imgInput ? Array.from(imgInput.files || []) : [];
+    const sizes = getProjectAttachmentBytes(quoteFiles, imageFiles);
+    const quoteLabel = document.getElementById("project-quote-size");
+    const imageLabel = document.getElementById("project-image-size");
+    const totalLabel = document.getElementById("project-attachment-total");
+    if (quoteLabel) {
+      const sel = formatBytes(sizes.selectedQuoteBytes);
+      const exist = formatBytes(sizes.existingQuoteBytes);
+      quoteLabel.textContent = `Quotes: ${quoteFiles.length} selected (${sel}), existing ${formatBytes(sizes.existingQuoteBytes)}`;
+    }
+    if (imageLabel) {
+      const sel = formatBytes(sizes.selectedImageBytes);
+      imageLabel.textContent = `Images: ${imageFiles.length} selected (${sel}), existing ${formatBytes(sizes.existingImageBytes)}`;
+    }
+    if (totalLabel) {
+      const text = `Total attachments (selected + existing): ${formatBytes(sizes.total)} / 10 MB budget`;
+      totalLabel.textContent = text;
+      totalLabel.style.color = sizes.total > MAX_PROJECT_TOTAL_BYTES ? "#b23c17" : "inherit";
+      totalLabel.style.fontWeight = sizes.total > MAX_PROJECT_TOTAL_BYTES ? "600" : "400";
+    }
+    return sizes;
   }
 
   function clearProjectFileObjectUrls() {
@@ -5946,6 +6013,7 @@
         imageList.innerHTML = "";
       }
     }
+    updateProjectAttachmentSizes();
   }
 
   function removeProjectAttachment(kind, index) {
@@ -5955,6 +6023,7 @@
       projectEditImageAttachments.splice(index, 1);
     }
     updateProjectAttachmentDisplays();
+    updateProjectAttachmentSizes();
   }
 
   function applyProjectAttachmentEdits(project) {
@@ -5996,6 +6065,7 @@
     projectEditQuoteAttachments = [];
     projectEditImageAttachments = [];
     updateProjectAttachmentDisplays();
+    updateProjectAttachmentSizes();
     const saveBtn = document.getElementById("proj-save-btn");
     if (saveBtn) saveBtn.textContent = "Add Project";
     const cancelBtn = document.getElementById("proj-cancel-btn");
