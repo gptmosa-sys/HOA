@@ -10,50 +10,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  .storage-mode-banner {
-    position: fixed;
-    bottom: 12px;
-    right: 12px;
-    background: #0f172a;
-    color: #e2e8f0;
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-size: 12px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.18);
-    z-index: 9999;
-    opacity: 0.9;
-  }
-  .storage-mode-banner.hidden { display: none; }
-  .storage-mode-row {
-    display: flex;
-    justify-content: flex-end;
-    margin: 0 0 18px;
-  }
-  .storage-mode-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
-    border-radius: 999px;
-    font-size: 0.9rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    border: 1px solid rgba(31, 49, 65, 0.15);
-    background: #e4f3ff;
-    color: #12304e;
-    box-shadow: 0 12px 22px rgba(20, 32, 45, 0.16);
-  }
-  .storage-mode-chip.hidden { display: none; }
-  .storage-mode-chip[data-variant="local"] {
-    background: #d7f5d8;
-    color: #0f2e14;
-    border-color: rgba(31, 65, 45, 0.2);
-  }
-  .storage-mode-chip[data-variant="cloud"] {
-    background: #e4f3ff;
-    color: #0f2e4c;
-    border-color: rgba(31, 49, 65, 0.2);
-  }
     :root {
       --ink: #1f3141;
       --ink-muted: rgba(31, 49, 65, 0.7);
@@ -1378,12 +1334,6 @@
       </div>
     </section>
 
-    <div class="storage-mode-row">
-      <div id="storage-mode-chip" class="storage-mode-chip hidden" role="status" aria-live="polite">
-        Storage mode: determining…
-      </div>
-    </div>
-
     <section class="tile-grid">
       <article class="tile-card" data-section="meetings" role="button" tabindex="0" onclick="openSection('meetings')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openSection('meetings');}">
         <span class="tile-icon" aria-hidden="true">
@@ -2126,39 +2076,7 @@
       const res = await fetch("/api/get-state");
       if (!res.ok) throw new Error("No state in Blob: " + res.status);
       const data = await res.json();
-      setStorageMode(res.headers.get("x-persist-mode") || "blob");
-
-      users              = data.users              || [];
-      dues               = data.dues               || [];
-      projects           = data.projects           || [];
-      documents          = data.documents          || [];
-      meetings           = data.meetings           || [];
-      minutes            = data.minutes            || [];
-      ideas              = data.ideas              || [];
-      votes              = data.votes              || [];
-      financials         = data.financials         || [];
-      residentDocuments  = data.residentDocuments  || [];
-      duesAmounts        = data.duesAmounts        || [];
-      balanceOverrides   = data.balanceOverrides   || [];
-      actionLog          = data.actionLog          || [];
-      sharedStateLoaded = true;
-
-      // Keep localStorage in sync for offline use.
-      localStorage.setItem("hoa-state", JSON.stringify(data));
-      localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users));
-      localStorage.setItem(STORAGE_KEYS.dues, JSON.stringify(dues));
-      localStorage.setItem(STORAGE_KEYS.projects, JSON.stringify(projects));
-      localStorage.setItem(STORAGE_KEYS.documents, JSON.stringify(documents));
-      localStorage.setItem(STORAGE_KEYS.meetings, JSON.stringify(meetings));
-      localStorage.setItem(STORAGE_KEYS.minutes, JSON.stringify(minutes));
-      localStorage.setItem(STORAGE_KEYS.ideas, JSON.stringify(ideas));
-      localStorage.setItem(STORAGE_KEYS.votes, JSON.stringify(votes));
-      localStorage.setItem(STORAGE_KEYS.financials, JSON.stringify(financials));
-      localStorage.setItem(STORAGE_KEYS.residentDocuments, JSON.stringify(residentDocuments));
-      localStorage.setItem(STORAGE_KEYS.duesAmounts, JSON.stringify(duesAmounts));
-      localStorage.setItem(STORAGE_KEYS.balanceOverrides, JSON.stringify(balanceOverrides));
-      localStorage.setItem(STORAGE_KEYS.actionLog, JSON.stringify(actionLog));
-
+      applyRemoteData(data, res.headers.get("x-persist-mode") || "blob");
       console.log("Loaded shared data from Vercel Blob");
     } catch (err) {
       console.warn("Blob load failed → falling back to localStorage", err);
@@ -2166,20 +2084,7 @@
       console.log('Blob load fallback: status code:', err.status || 'unknown');
       const saved = localStorage.getItem("hoa-state");
       if (saved) {
-        const parsed = JSON.parse(saved);
-        users             = parsed.users             || [];
-        dues              = parsed.dues              || [];
-        projects          = parsed.projects          || [];
-        documents         = parsed.documents         || [];
-        meetings          = parsed.meetings          || [];
-        minutes           = parsed.minutes           || [];
-        ideas             = parsed.ideas             || [];
-        votes             = parsed.votes             || [];
-        financials        = parsed.financials        || [];
-        residentDocuments = parsed.residentDocuments || [];
-        duesAmounts       = parsed.duesAmounts       || [];
-        balanceOverrides  = parsed.balanceOverrides  || [];
-        actionLog         = parsed.actionLog         || [];
+        applyRemoteData(JSON.parse(saved), "offline/local");
       }
       sharedStateLoaded = true;
       setStorageMode("offline/local");
@@ -2190,6 +2095,93 @@
     renderDues();
     renderProjects();
     // call any other render functions you have here
+  }
+
+  function applyRemoteData(data, persistMode) {
+    users              = data.users              || [];
+    dues               = data.dues               || [];
+    projects           = data.projects           || [];
+    documents          = data.documents          || [];
+    meetings           = data.meetings           || [];
+    minutes            = data.minutes            || [];
+    ideas              = data.ideas              || [];
+    votes              = data.votes              || [];
+    financials         = data.financials         || [];
+    residentDocuments  = data.residentDocuments  || [];
+    duesAmounts        = data.duesAmounts        || [];
+    balanceOverrides   = data.balanceOverrides   || [];
+    actionLog          = data.actionLog          || [];
+    sharedStateLoaded = true;
+
+    if (persistMode) setStorageMode(persistMode);
+
+    // Keep localStorage in sync for offline use.
+    localStorage.setItem("hoa-state", JSON.stringify(data));
+    localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users));
+    localStorage.setItem(STORAGE_KEYS.dues, JSON.stringify(dues));
+    localStorage.setItem(STORAGE_KEYS.projects, JSON.stringify(projects));
+    localStorage.setItem(STORAGE_KEYS.documents, JSON.stringify(documents));
+    localStorage.setItem(STORAGE_KEYS.meetings, JSON.stringify(meetings));
+    localStorage.setItem(STORAGE_KEYS.minutes, JSON.stringify(minutes));
+    localStorage.setItem(STORAGE_KEYS.ideas, JSON.stringify(ideas));
+    localStorage.setItem(STORAGE_KEYS.votes, JSON.stringify(votes));
+    localStorage.setItem(STORAGE_KEYS.financials, JSON.stringify(financials));
+    localStorage.setItem(STORAGE_KEYS.residentDocuments, JSON.stringify(residentDocuments));
+    localStorage.setItem(STORAGE_KEYS.duesAmounts, JSON.stringify(duesAmounts));
+    localStorage.setItem(STORAGE_KEYS.balanceOverrides, JSON.stringify(balanceOverrides));
+    localStorage.setItem(STORAGE_KEYS.actionLog, JSON.stringify(actionLog));
+  }
+
+  function renderSectionById(id) {
+    switch (id) {
+      case "meetings":
+        renderMeetings();
+        renderDashboard();
+        break;
+      case "minutes":
+        renderMinutes();
+        break;
+      case "voting":
+        renderVotes();
+        renderDashboard();
+        break;
+      case "ideas":
+        renderIdeas();
+        break;
+      case "dues":
+        renderDues();
+        renderDashboard();
+        break;
+      case "financials":
+        renderFinancials();
+        renderDashboard();
+        break;
+      case "documents":
+        renderDocuments();
+        renderResidentDocuments();
+        renderDashboard();
+        break;
+      case "projects":
+        renderProjects();
+        renderDashboard();
+        break;
+      default:
+        renderDashboard();
+        break;
+    }
+  }
+
+  async function refreshSectionData(id) {
+    try {
+      const res = await fetch("/api/get-state", { cache: "no-store" });
+      if (!res.ok) throw new Error("No state in Blob: " + res.status);
+      const data = await res.json();
+      applyRemoteData(data, res.headers.get("x-persist-mode") || "blob");
+      renderSectionById(id);
+    } catch (err) {
+      console.warn("Section refresh failed; using cached data", err);
+      renderSectionById(id);
+    }
   }
 
   function generateId(prefix = "id") {
@@ -2622,7 +2614,8 @@
     updateDocumentsTabs();
   }
 
-  function openSection(id) {
+  async function openSection(id) {
+    await refreshSectionData(id);
     switchSection(id);
     if (settingsPanel) settingsPanel.classList.add("hidden");
     const shell = document.getElementById("detail-card");
@@ -6649,35 +6642,8 @@
 
   window.addEventListener("beforeunload", clearProjectFileObjectUrls);
 
-  let storageModeEl = document.getElementById("storage-mode-indicator");
-  let storageModeChip = document.getElementById("storage-mode-chip");
-
-  function ensureStorageModeRefs() {
-    if (!storageModeEl) storageModeEl = document.getElementById("storage-mode-indicator");
-    if (!storageModeChip) storageModeChip = document.getElementById("storage-mode-chip");
-  }
-
-  function setStorageMode(mode) {
-    ensureStorageModeRefs();
-    const label = (mode || "").toLowerCase();
-    const isLocal = label.includes("local") || label.includes("offline");
-    const variant = isLocal ? "local" : "cloud";
-    const summary = isLocal
-      ? "Local-only (this device)"
-      : "Cloud sync" + (label ? " (" + label + ")" : "");
-    const detail = isLocal
-      ? "Reading & writing to local files on this device (not the backend database)."
-      : "Synced with the backend store; local cache kept for speed.";
-
-    if (storageModeEl) {
-      storageModeEl.textContent = "Storage mode: " + (summary || "unknown");
-      storageModeEl.classList.remove("hidden");
-    }
-    if (storageModeChip) {
-      storageModeChip.textContent = detail;
-      storageModeChip.dataset.variant = variant;
-      storageModeChip.classList.remove("hidden");
-    }
+  function setStorageMode(_mode) {
+    // Storage mode indicator removed (was only for testing); keep stub to avoid errors.
   }
 
   window.onload = async function() {
@@ -6693,7 +6659,6 @@
   };
 </script>
 
-<div id="storage-mode-indicator" class="storage-mode-banner hidden">Storage mode: …</div>
 <div class="scroll-initials">Re</div>
 
 </body>
