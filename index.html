@@ -6048,25 +6048,26 @@
       };
 
       if (filePromises.length) {
-        Promise.all(filePromises).then(results => {
+        Promise.allSettled(filePromises).then(results => {
+          const values = results.map(r => r.status === "fulfilled" ? r.value : null);
           let resultIndex = 0;
           if (quoteFiles.length) {
             const newQuotes = quoteFiles.map(file => ({
               name: file.name,
-              data: results[resultIndex++] || null
+              data: values[resultIndex++] || null
             }));
             projectEditQuoteAttachments = projectEditQuoteAttachments.concat(newQuotes);
           }
           if (imageFiles.length) {
             const newImages = imageFiles.map(file => ({
               name: file.name,
-              data: results[resultIndex++] || null
+              data: values[resultIndex++] || null
             }));
             projectEditImageAttachments = projectEditImageAttachments.concat(newImages);
           }
           updateProjectAttachmentDisplays();
           finalizeEdit();
-        }).catch(() => alert("Unable to read attachments. Please try again."));
+        });
         return;
       }
       finalizeEdit();
@@ -6075,16 +6076,17 @@
       const filesToRead = [];
       quoteFiles.forEach(file => filesToRead.push(readFileAsDataUrl(file)));
       imageFiles.forEach(file => filesToRead.push(readFileAsDataUrl(file)));
-      Promise.all(filesToRead).then(results => {
+      Promise.allSettled(filesToRead).then(results => {
+        const values = results.map(r => r.status === "fulfilled" ? r.value : null);
         let resultIndex = 0;
         const quotes = quoteFiles.map(file => ({
           name: file.name,
-          data: results[resultIndex++] || null
+          data: values[resultIndex++] || null
         }));
         const primaryQuote = quotes[0] || null;
         const images = imageFiles.map(file => ({
           name: file.name,
-          data: results[resultIndex++] || null
+          data: values[resultIndex++] || null
         }));
         const primaryImage = images[0] || null;
         projects.push({
@@ -6111,7 +6113,7 @@
         resetProjectForm();
         renderProjects();
         renderFinancials();
-      }).catch(() => alert("Unable to read attachments. Please try again."));
+      });
       return;
     }
   }
