@@ -1,6 +1,6 @@
 import { get, list } from "@vercel/blob";
 
-export const config = { runtime: "edge" };
+export const config = { runtime: "nodejs20.x" };
 
 const BLOB_PATH = "hoa-state.json";
 
@@ -21,9 +21,10 @@ const emptyState = {
   timestamp: null
 };
 
-export default async function handler(req) {
+export default async function handler(req, res) {
   if (req.method !== "GET") {
-    return new Response("Method Not Allowed", { status: 405 });
+    res.status(405).send("Method Not Allowed");
+    return;
   }
 
   try {
@@ -31,31 +32,28 @@ export default async function handler(req) {
     const existing = blobs.find(b => b.pathname === BLOB_PATH);
 
     if (!existing) {
-      return new Response(JSON.stringify(emptyState), {
-        status: 200,
-        headers: {
-          "content-type": "application/json",
-          "cache-control": "no-store",
-          "x-persist-mode": "blob",
-          "x-blob-version": ""
-        }
-      });
+      res
+        .status(200)
+        .setHeader("content-type", "application/json")
+        .setHeader("cache-control", "no-store")
+        .setHeader("x-persist-mode", "blob")
+        .setHeader("x-blob-version", "")
+        .send(JSON.stringify(emptyState));
+      return;
     }
 
     const { body, contentType } = await get(existing.url);
     const text = await new Response(body).text();
 
-    return new Response(text, {
-      status: 200,
-      headers: {
-        "content-type": contentType || "application/json",
-        "cache-control": "no-store",
-        "x-persist-mode": "blob",
-        "x-blob-version": existing.etag || ""
-      }
-    });
+    res
+      .status(200)
+      .setHeader("content-type", contentType || "application/json")
+      .setHeader("cache-control", "no-store")
+      .setHeader("x-persist-mode", "blob")
+      .setHeader("x-blob-version", existing.etag || "")
+      .send(text);
   } catch (err) {
     console.error("get-state error", err);
-    return new Response("Failed to load state", { status: 500 });
+    res.status(err?.status || 500).send("Failed to load state");
   }
 }

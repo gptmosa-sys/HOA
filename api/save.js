@@ -1,21 +1,30 @@
 import { put } from "@vercel/blob";
 
-export const config = { runtime: "edge" };
+export const config = { runtime: "nodejs20.x" };
 
 const BLOB_PATH = "hoa-state.json";
 
-export default async function handler(req) {
+async function readJson(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const text = Buffer.concat(chunks).toString("utf8");
+  return JSON.parse(text || "{}");
+}
+
+export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return new Response("Method Not Allowed", { status: 405 });
+    res.status(405).send("Method Not Allowed");
+    return;
   }
 
   try {
-    const { data } = await req.json();
+    const { data } = await readJson(req);
     if (!data || typeof data !== "object") {
-      return new Response("Invalid payload", { status: 400 });
+      res.status(400).send("Invalid payload");
+      return;
     }
 
-    const ifMatch = req.headers.get("if-match") || undefined;
+    const ifMatch = req.headers["if-match"] || undefined;
     const token =
       process.env.BLOB_READ_WRITE_TOKEN ||
       process.env.VERCEL_BLOB_RW_TOKEN ||
@@ -29,18 +38,16 @@ export default async function handler(req) {
       token
     });
 
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: {
-        "content-type": "application/json",
-        "cache-control": "no-store",
-        "x-persist-mode": "blob",
-        "x-blob-version": upload.etag || ""
-      }
-    });
+    res
+      .status(200)
+      .setHeader("content-type", "application/json")
+      .setHeader("cache-control", "no-store")
+      .setHeader("x-persist-mode", "blob")
+      .setHeader("x-blob-version", upload.etag || "")
+      .send(JSON.stringify({ ok: true }));
   } catch (err) {
     const status = err?.status || 500;
     console.error("save error", err);
-    return new Response("Save failed", { status });
+    res.status(status).send("Save failed");
   }
 }
