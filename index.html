@@ -6032,6 +6032,7 @@
         applyProjectAttachmentEdits(project);
         project.updatedAt = new Date().toISOString();
         saveLocalData(STORAGE_KEYS.projects, projects);
+        flushPendingSave();
         resetProjectForm();
         renderProjects();
         renderFinancials();
@@ -6097,6 +6098,7 @@
           createdAt: new Date().toISOString()
         });
         saveLocalData(STORAGE_KEYS.projects, projects);
+        flushPendingSave();
         resetProjectForm();
         renderProjects();
         renderFinancials();
