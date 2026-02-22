@@ -2037,24 +2037,11 @@
   }
 
   let saveTimer = null;
-  let saveInFlight = null;
 
   function queueSave() {
     clearTimeout(saveTimer);
     // debounce frequent updates so we only POST once per quick burst
-    saveTimer = setTimeout(() => {
-      saveTimer = null;
-      saveInFlight = saveData().finally(() => { saveInFlight = null; });
-    }, 800);
-  }
-
-  function flushPendingSave() {
-    if (saveTimer) {
-      clearTimeout(saveTimer);
-      saveTimer = null;
-      saveInFlight = saveData().finally(() => { saveInFlight = null; });
-    }
-    return saveInFlight || Promise.resolve();
+    saveTimer = setTimeout(saveData, 800);
   }
 
   function saveLocalData(key, value) {
@@ -4896,7 +4883,6 @@
         logAction(`Submitted idea "${title}"`);
       }
       saveLocalData(STORAGE_KEYS.ideas, ideas);
-      flushPendingSave(); // ensure ideas persist even if user navigates away
       resetIdeaForm();
       renderIdeas();
     };
@@ -6689,7 +6675,6 @@
   }
 
   window.addEventListener("beforeunload", clearProjectFileObjectUrls);
-  window.addEventListener("beforeunload", flushPendingSave);
 
   function setStorageMode(_mode) {
     // Storage mode indicator removed (was only for testing); keep stub to avoid errors.

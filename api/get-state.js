@@ -12,11 +12,17 @@ export default async function handler(req, res) {
     const blob = blobs.find(b => b.pathname === key);
     if (!blob) throw new Error('Blob not found');
 
-    const blobRes = await fetch(blob.url);
+    // Force bypass of any CDN caching so newest blob data is always returned.
+    const blobRes = await fetch(blob.url + `?nocache=${Date.now()}`, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' }
+    });
     if (!blobRes.ok) throw new Error('Blob fetch failed');
 
     const data = await blobRes.json();
 
+    // Prevent downstream caching of the API response as well.
+    res.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
     return res.status(200).json(data);
   } catch (error) {
     console.error(error);
