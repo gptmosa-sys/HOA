@@ -3,11 +3,16 @@ import { promises as fs } from 'fs';
 import path from 'path';
 
 const isVercel = process.env.VERCEL === '1';
-const preferBlob = process.env.PERSIST_MODE === 'blob' || isVercel;
+const hasBlobToken = !!process.env.BLOB_READ_WRITE_TOKEN;
+const preferBlob = process.env.PERSIST_MODE === 'blob' || (isVercel && hasBlobToken);
 const FILE_PATH = isVercel
   ? path.join(process.env.TMPDIR || '/tmp', 'data.json')
   : path.join(process.cwd(), 'data.json');
 const BLOB_KEY = 'hoa-state.json';
+
+function logDebug(...args) {
+  console.log('[storage/save]', ...args);
+}
 
 async function saveToFile(data) {
   await fs.writeFile(FILE_PATH, JSON.stringify(data, null, 2), 'utf8');
@@ -34,21 +39,35 @@ export default async function handler(req, res) {
   }
 
   try {
+    logDebug('attempt', preferBlob ? 'blob' : 'file', {
+      isVercel,
+      hasBlobToken,
+      filePath: FILE_PATH,
+      blobKey: BLOB_KEY
+    });
     const result = preferBlob ? await saveToBlob(data) : await saveToFile(data);
     res.setHeader('X-Persist-Mode', result.mode);
+    logDebug('success', result.mode, { url: result.url });
     return res.status(200).json({ success: true, url: result.url, mode: result.mode });
   } catch (error) {
     console.error('Primary save failed', error);
-    // Fallback to file when blob fails, but only where the FS is writable.
-    if (preferBlob && !isVercel) {
+    // Fallback to file; works locally and in Vercel (/tmp).
+    if (preferBlob) {
       try {
         const result = await saveToFile(data);
         res.setHeader('X-Persist-Mode', 'file');
+        logDebug('fallback-file-success', { url: result.url });
         return res.status(200).json({ success: true, url: result.url, mode: 'file', fallback: true });
       } catch (fallbackErr) {
         console.error('File fallback failed', fallbackErr);
       }
     }
-    return res.status(500).json({ error: 'Failed to save state' });
+    return res.status(500).json({
+      error: 'Failed to save state',
+      detail: error?.message || 'unknown',
+      tried: preferBlob ? 'blob' : 'file',
+      filePath: FILE_PATH,
+      blobKey: BLOB_KEY
+    });
   }
 }
