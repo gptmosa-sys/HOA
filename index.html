@@ -1930,26 +1930,160 @@
   let dataModalListenerAttached = false;
   let logoDataUrlCache = null;
 
-  function loadData(key, fallback = []) {
+  let users = [];
+  let dues = [];
+  let projects = [];
+  let documents = [];
+  let meetings = [];
+  let votes = [];
+  let financials = [];
+  let sharedStateLoaded = false;
+
+  const SHARED_KEYS = new Set([
+    STORAGE_KEYS.users,
+    STORAGE_KEYS.dues,
+    STORAGE_KEYS.projects,
+    STORAGE_KEYS.documents,
+    STORAGE_KEYS.meetings,
+    STORAGE_KEYS.votes,
+    STORAGE_KEYS.financials
+  ]);
+
+  function getSharedStateRef(key) {
+    switch (key) {
+      case STORAGE_KEYS.users: return users;
+      case STORAGE_KEYS.dues: return dues;
+      case STORAGE_KEYS.projects: return projects;
+      case STORAGE_KEYS.documents: return documents;
+      case STORAGE_KEYS.meetings: return meetings;
+      case STORAGE_KEYS.votes: return votes;
+      case STORAGE_KEYS.financials: return financials;
+      default: return null;
+    }
+  }
+
+  function setSharedStateRef(key, value) {
+    const normalized = Array.isArray(value) ? value : [];
+    switch (key) {
+      case STORAGE_KEYS.users: users = normalized; break;
+      case STORAGE_KEYS.dues: dues = normalized; break;
+      case STORAGE_KEYS.projects: projects = normalized; break;
+      case STORAGE_KEYS.documents: documents = normalized; break;
+      case STORAGE_KEYS.meetings: meetings = normalized; break;
+      case STORAGE_KEYS.votes: votes = normalized; break;
+      case STORAGE_KEYS.financials: financials = normalized; break;
+      default: break;
+    }
+  }
+
+  function loadLocalData(key, fallback = []) {
+    if (SHARED_KEYS.has(key) && sharedStateLoaded) {
+      const ref = getSharedStateRef(key);
+      return Array.isArray(ref) ? ref : Array.isArray(fallback) ? [...fallback] : fallback;
+    }
     try {
       const raw = localStorage.getItem(key);
-      if (!raw) return Array.isArray(fallback) ? [...fallback] : fallback;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(fallback) && !Array.isArray(parsed)) return [...fallback];
-      return parsed;
+      const parsed = raw ? JSON.parse(raw) : null;
+      const value = parsed !== null ? parsed : Array.isArray(fallback) ? [...fallback] : fallback;
+      if (SHARED_KEYS.has(key)) {
+        setSharedStateRef(key, value);
+      }
+      return value;
     } catch (err) {
       console.warn("Failed to load", key, err);
       return Array.isArray(fallback) ? [...fallback] : fallback;
     }
-    updateResidentDocFileFieldVisibility();
   }
 
-  function saveData(key, value) {
+  function saveLocalData(key, value) {
+    if (SHARED_KEYS.has(key)) {
+      setSharedStateRef(key, value);
+    }
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (err) {
       console.error("Failed to save", key, err);
     }
+    if (SHARED_KEYS.has(key)) {
+      // Fire-and-forget; keep UI responsive.
+      saveData();
+    }
+  }
+
+  async function saveData() {
+    const fullState = {
+      users,
+      dues,
+      projects,
+      documents,
+      meetings,
+      votes,
+      financials,
+      timestamp: new Date().toISOString()
+    };
+
+    try {
+      const res = await fetch("/api/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: fullState })
+      });
+
+      if (!res.ok) throw new Error("Save failed: " + res.status);
+      console.log("Saved to Vercel Blob successfully");
+    } catch (err) {
+      console.error("Blob save error:", err);
+      localStorage.setItem("hoa-state", JSON.stringify(fullState));
+    }
+  }
+
+  async function loadData() {
+    try {
+      const res = await fetch("/api/get-state");
+      if (!res.ok) throw new Error("No state in Blob: " + res.status);
+      const data = await res.json();
+
+      users      = data.users      || [];
+      dues       = data.dues       || [];
+      projects   = data.projects   || [];
+      documents  = data.documents  || [];
+      meetings   = data.meetings   || [];
+      votes      = data.votes      || [];
+      financials = data.financials || [];
+      sharedStateLoaded = true;
+
+      // Keep localStorage in sync for offline use.
+      localStorage.setItem("hoa-state", JSON.stringify(data));
+      localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users));
+      localStorage.setItem(STORAGE_KEYS.dues, JSON.stringify(dues));
+      localStorage.setItem(STORAGE_KEYS.projects, JSON.stringify(projects));
+      localStorage.setItem(STORAGE_KEYS.documents, JSON.stringify(documents));
+      localStorage.setItem(STORAGE_KEYS.meetings, JSON.stringify(meetings));
+      localStorage.setItem(STORAGE_KEYS.votes, JSON.stringify(votes));
+      localStorage.setItem(STORAGE_KEYS.financials, JSON.stringify(financials));
+
+      console.log("Loaded shared data from Vercel Blob");
+    } catch (err) {
+      console.warn("Blob load failed → falling back to localStorage", err);
+      const saved = localStorage.getItem("hoa-state");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        users      = parsed.users      || [];
+        dues       = parsed.dues       || [];
+        projects   = parsed.projects   || [];
+        documents  = parsed.documents  || [];
+        meetings   = parsed.meetings   || [];
+        votes      = parsed.votes      || [];
+        financials = parsed.financials || [];
+      }
+      sharedStateLoaded = true;
+    }
+
+    renderDashboard();
+    renderUsers();
+    renderDues();
+    renderProjects();
+    // call any other render functions you have here
   }
 
   function generateId(prefix = "id") {
@@ -1957,7 +2091,7 @@
   }
 
   function loadBalanceForwardOverrides() {
-    const overrides = loadData(STORAGE_KEYS.balanceOverrides);
+    const overrides = loadLocalData(STORAGE_KEYS.balanceOverrides);
     if (!Array.isArray(overrides)) return [];
     return overrides
       .map(entry => ({
@@ -1971,7 +2105,7 @@
   }
 
   function saveBalanceForwardOverrides(overrides) {
-    saveData(STORAGE_KEYS.balanceOverrides, overrides);
+    saveLocalData(STORAGE_KEYS.balanceOverrides, overrides);
   }
 
   function getBalanceForwardOverrideEntry(year) {
@@ -2004,7 +2138,7 @@
   function getFullCurrentUser() {
     const current = getCurrentUser();
     if (!current) return null;
-    const users = loadData(STORAGE_KEYS.users);
+    const users = loadLocalData(STORAGE_KEYS.users);
     return users.find(u => u.id === current.id) || null;
   }
 
@@ -2084,28 +2218,28 @@
     const addYear = yr => {
       if (Number.isFinite(yr)) years.add(yr);
     };
-    const meetings = loadData(STORAGE_KEYS.meetings);
+    const meetings = loadLocalData(STORAGE_KEYS.meetings);
     const meetingYearMap = buildMeetingYearMap(meetings);
     meetings.forEach(m => addYear(meetingYearMap.get(m.id)));
-    const minutes = loadData(STORAGE_KEYS.minutes);
+    const minutes = loadLocalData(STORAGE_KEYS.minutes);
     minutes.forEach(min => addYear(getEntryYear(STORAGE_KEYS.minutes, min, meetingYearMap)));
-    const ideas = loadData(STORAGE_KEYS.ideas);
+    const ideas = loadLocalData(STORAGE_KEYS.ideas);
     ideas.forEach(i => addYear(getEntryYear(STORAGE_KEYS.ideas, i)));
-    const votes = loadData(STORAGE_KEYS.votes);
+    const votes = loadLocalData(STORAGE_KEYS.votes);
     votes.forEach(v => addYear(getEntryYear(STORAGE_KEYS.votes, v)));
-    const financials = loadData(STORAGE_KEYS.financials);
+    const financials = loadLocalData(STORAGE_KEYS.financials);
     financials.forEach(f => addYear(getEntryYear(STORAGE_KEYS.financials, f)));
-    const projects = loadData(STORAGE_KEYS.projects);
+    const projects = loadLocalData(STORAGE_KEYS.projects);
     projects.forEach(p => addYear(getEntryYear(STORAGE_KEYS.projects, p)));
-    const dues = loadData(STORAGE_KEYS.dues);
+    const dues = loadLocalData(STORAGE_KEYS.dues);
     dues.forEach(d => addYear(getEntryYear(STORAGE_KEYS.dues, d)));
-    const documents = loadData(STORAGE_KEYS.documents);
+    const documents = loadLocalData(STORAGE_KEYS.documents);
     documents.forEach(d => addYear(getEntryYear(STORAGE_KEYS.documents, d)));
-    const residentDocs = loadData(STORAGE_KEYS.residentDocuments);
+    const residentDocs = loadLocalData(STORAGE_KEYS.residentDocuments);
     residentDocs.forEach(d => addYear(getEntryYear(STORAGE_KEYS.residentDocuments, d)));
-    const duesAmounts = loadData(STORAGE_KEYS.duesAmounts);
+    const duesAmounts = loadLocalData(STORAGE_KEYS.duesAmounts);
     duesAmounts.forEach(d => addYear(getEntryYear(STORAGE_KEYS.duesAmounts, d)));
-    const balanceOverrides = loadData(STORAGE_KEYS.balanceOverrides);
+    const balanceOverrides = loadLocalData(STORAGE_KEYS.balanceOverrides);
     balanceOverrides.forEach(b => addYear(getEntryYear(STORAGE_KEYS.balanceOverrides, b)));
     return Array.from(years).filter(Number.isFinite).sort((a, b) => a - b);
   }
@@ -2134,7 +2268,7 @@
   }
 
   function initSuperAdmin() {
-    let users = loadData(STORAGE_KEYS.users);
+    let users = loadLocalData(STORAGE_KEYS.users);
     const hasSuper = users.some(u => u.role === "superadmin");
     if (!hasSuper) {
       users.push({
@@ -2147,7 +2281,7 @@
         approved: true,
         createdAt: new Date().toISOString()
       });
-      saveData(STORAGE_KEYS.users, users);
+      saveLocalData(STORAGE_KEYS.users, users);
     }
   }
 
@@ -2174,7 +2308,7 @@
       alert("Enter your email and password.");
       return;
     }
-    const users = loadData(STORAGE_KEYS.users);
+    const users = loadLocalData(STORAGE_KEYS.users);
     const user = users.find(u => (u.email || "").toLowerCase() === email);
     if (!user || user.password !== password) {
       alert("Invalid email or password.");
@@ -2209,7 +2343,7 @@
       alert("Enter a lot number between 1 and " + TOTAL_LOTS + ".");
       return;
     }
-    let users = loadData(STORAGE_KEYS.users);
+    let users = loadLocalData(STORAGE_KEYS.users);
     if (users.some(u => (u.email || "").toLowerCase() === email)) {
       alert("An account with that email already exists.");
       return;
@@ -2224,7 +2358,7 @@
       approved: false,
       createdAt: new Date().toISOString()
     });
-    saveData(STORAGE_KEYS.users, users);
+    saveLocalData(STORAGE_KEYS.users, users);
     nameInput.value = "";
     emailInput.value = "";
     lotInput.value = "";
@@ -2392,7 +2526,7 @@
   }
 
   function getActionLogEntries() {
-    return loadData(STORAGE_KEYS.actionLog);
+    return loadLocalData(STORAGE_KEYS.actionLog);
   }
 
   function logAction(description, actor) {
@@ -2413,7 +2547,7 @@
     if (logs.length > 500) {
       logs.length = 500;
     }
-    saveData(STORAGE_KEYS.actionLog, logs);
+    saveLocalData(STORAGE_KEYS.actionLog, logs);
     const panel = document.getElementById("action-log-panel");
     if (panel && !panel.classList.contains("hidden")) {
       renderActionLog();
@@ -2479,7 +2613,7 @@
       return;
     }
     if (!confirm("Clear all action log entries? This cannot be undone.")) return;
-    saveData(STORAGE_KEYS.actionLog, []);
+    saveLocalData(STORAGE_KEYS.actionLog, []);
     renderActionLog();
   }
 
@@ -2600,11 +2734,11 @@
   }
 
   function buildDataSnapshot(yearFilter) {
-    const meetings = loadData(STORAGE_KEYS.meetings);
+    const meetings = loadLocalData(STORAGE_KEYS.meetings);
     const meetingYearMap = buildMeetingYearMap(meetings);
     const data = {};
     DATA_EXPORT_KEYS.forEach(key => {
-      let records = key === STORAGE_KEYS.meetings ? meetings.slice() : loadData(key);
+      let records = key === STORAGE_KEYS.meetings ? meetings.slice() : loadLocalData(key);
       if (Number.isFinite(yearFilter) && !DATA_ALWAYS_INCLUDE_KEYS.has(key)) {
         records = filterDatasetForYear(records, key, yearFilter, meetingYearMap);
       }
@@ -2656,22 +2790,22 @@
     const incomingData = payload.data;
     const incomingMeetings = Array.isArray(incomingData[STORAGE_KEYS.meetings]) ? incomingData[STORAGE_KEYS.meetings] : [];
     const incomingMeetingYearMap = buildMeetingYearMap(incomingMeetings);
-    const existingMeetings = loadData(STORAGE_KEYS.meetings);
+    const existingMeetings = loadLocalData(STORAGE_KEYS.meetings);
     const existingMeetingYearMap = buildMeetingYearMap(existingMeetings);
 
     DATA_EXPORT_KEYS.forEach(key => {
       const incomingRecords = Array.isArray(incomingData[key]) ? incomingData[key] : [];
       if (replaceAll) {
-        saveData(key, incomingRecords);
+        saveLocalData(key, incomingRecords);
         return;
       }
       if (DATA_ALWAYS_INCLUDE_KEYS.has(key)) {
         return;
       }
-      const existingRecords = loadData(key);
+      const existingRecords = loadLocalData(key);
       const remaining = existingRecords.filter(entry => getEntryYear(key, entry, existingMeetingYearMap) !== yearFilter);
       const incomingFiltered = filterDatasetForYear(incomingRecords, key, yearFilter, incomingMeetingYearMap);
-      saveData(key, remaining.concat(incomingFiltered));
+      saveLocalData(key, remaining.concat(incomingFiltered));
     });
     refreshAllViews();
   }
@@ -2774,7 +2908,7 @@
       alert("Title, date, and location are required.");
       return;
     }
-    let meetings = loadData(STORAGE_KEYS.meetings);
+    let meetings = loadLocalData(STORAGE_KEYS.meetings);
     if (meetingEditId) {
       const existing = meetings.find(m => m.id === meetingEditId);
       if (existing) {
@@ -2797,7 +2931,7 @@
         description
       });
     }
-    saveData(STORAGE_KEYS.meetings, meetings);
+    saveLocalData(STORAGE_KEYS.meetings, meetings);
     resetMeetingFormFields();
     exitMeetingEditMode();
     renderMeetings();
@@ -2811,7 +2945,7 @@
       alert("Only board or admin can edit meetings.");
       return;
     }
-    const meetings = loadData(STORAGE_KEYS.meetings);
+    const meetings = loadLocalData(STORAGE_KEYS.meetings);
     const target = meetings.find(m => m.id === id);
     if (!target) return;
     meetingEditId = target.id;
@@ -2863,10 +2997,10 @@
       return;
     }
     if (!confirm("Delete this meeting?")) return;
-    let meetings = loadData(STORAGE_KEYS.meetings);
+    let meetings = loadLocalData(STORAGE_KEYS.meetings);
     const nextMeetings = meetings.filter(m => m.id !== id);
     if (nextMeetings.length === meetings.length) return;
-    saveData(STORAGE_KEYS.meetings, nextMeetings);
+    saveLocalData(STORAGE_KEYS.meetings, nextMeetings);
     if (meetingEditId === id) {
       resetMeetingFormFields();
       exitMeetingEditMode();
@@ -2887,7 +3021,7 @@
   }
 
   function renderMeetings() {
-    let meetings = loadData(STORAGE_KEYS.meetings);
+    let meetings = loadLocalData(STORAGE_KEYS.meetings);
     meetings.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
     const today = new Date().toISOString().slice(0, 10);
     const upcoming = meetings.filter(m => m.date >= today);
@@ -2961,7 +3095,7 @@
       renderDues();
       return;
     }
-    let dues = loadData(STORAGE_KEYS.dues);
+    let dues = loadLocalData(STORAGE_KEYS.dues);
     let record = dues.find(d => d.year === year && d.lot === lot);
     if (!record) {
       record = {
@@ -2989,7 +3123,7 @@
     }
     record.updatedAt = new Date().toISOString();
     record.updatedBy = user ? user.id : null;
-    saveData(STORAGE_KEYS.dues, dues);
+    saveLocalData(STORAGE_KEYS.dues, dues);
     renderDues();
     renderDashboard();
     renderFinancials();
@@ -2999,7 +3133,7 @@
     const normalizedAmount = (typeof options.amountPaid === "number" && !Number.isNaN(options.amountPaid))
       ? Math.round(options.amountPaid * 100) / 100
       : null;
-    let dues = loadData(STORAGE_KEYS.dues);
+    let dues = loadLocalData(STORAGE_KEYS.dues);
     let record = dues.find(d => d.year === year && d.lot === lot);
     const now = new Date().toISOString();
     if (record) {
@@ -3025,12 +3159,12 @@
       };
       dues.push(record);
     }
-    saveData(STORAGE_KEYS.dues, dues);
+    saveLocalData(STORAGE_KEYS.dues, dues);
   }
 
   function confirmDuesStatusChange(year, lot, newPaid) {
     if (newPaid) return true;
-    const dues = loadData(STORAGE_KEYS.dues);
+    const dues = loadLocalData(STORAGE_KEYS.dues);
     const existing = dues.find(d => d.year === year && d.lot === lot);
     if (existing && existing.paid && !newPaid) {
       return confirm("Lot " + lot + " is currently marked as paid for " + year + ". Change to unpaid?");
@@ -3039,7 +3173,7 @@
   }
 
   function getDuesAmountMap() {
-    const amounts = loadData(STORAGE_KEYS.duesAmounts);
+    const amounts = loadLocalData(STORAGE_KEYS.duesAmounts);
     const map = {};
     amounts.forEach(entry => {
       if (typeof entry.year === "number" && typeof entry.amount === "number" && !Number.isNaN(entry.amount)) {
@@ -3051,7 +3185,7 @@
 
   function getDuesAmountEntry(year) {
     if (!Number.isFinite(year)) return null;
-    const entries = loadData(STORAGE_KEYS.duesAmounts);
+    const entries = loadLocalData(STORAGE_KEYS.duesAmounts);
     return entries.find(entry => entry.year === year) || null;
   }
 
@@ -3239,7 +3373,7 @@
   function renderDuesAmountList() {
     const list = document.getElementById("dues-amount-list");
     if (!list) return;
-    const entries = loadData(STORAGE_KEYS.duesAmounts)
+    const entries = loadLocalData(STORAGE_KEYS.duesAmounts)
       .map(entry => ({
         year: Number(entry.year),
         amount: Number(entry.amount),
@@ -3330,7 +3464,7 @@
     }
     const targetYear = duesAmountEditYear !== null ? duesAmountEditYear : year;
     const amount = Math.round(amountRaw * 100) / 100;
-    let amounts = loadData(STORAGE_KEYS.duesAmounts);
+    let amounts = loadLocalData(STORAGE_KEYS.duesAmounts);
     const existing = amounts.find(a => a.year === targetYear);
     if (existing) {
       existing.amount = amount;
@@ -3338,7 +3472,7 @@
     } else {
       amounts.push({ year: targetYear, amount, note });
     }
-    saveData(STORAGE_KEYS.duesAmounts, amounts);
+    saveLocalData(STORAGE_KEYS.duesAmounts, amounts);
     duesAmountEditYear = null;
     if (yearInput) {
       yearInput.disabled = false;
@@ -3460,7 +3594,7 @@
       alert("Title is required.");
       return;
     }
-    let documents = loadData(STORAGE_KEYS.documents);
+    let documents = loadLocalData(STORAGE_KEYS.documents);
     const existing = documentEditId ? documents.find(doc => doc.id === documentEditId) : null;
     if (!documentEditId && !file) {
       alert("Please choose a file to upload.");
@@ -3488,7 +3622,7 @@
           updatedAt: new Date().toISOString()
         });
       }
-      saveData(STORAGE_KEYS.documents, documents);
+      saveLocalData(STORAGE_KEYS.documents, documents);
       const actionLabel = isUpdating ? "Updated" : "Uploaded";
       logAction(`${actionLabel} Kingston document "${title}"`);
       resetDocumentFormFields();
@@ -3511,7 +3645,7 @@
       alert("Only board or admin can edit documents.");
       return;
     }
-    const documents = loadData(STORAGE_KEYS.documents);
+    const documents = loadLocalData(STORAGE_KEYS.documents);
     const doc = documents.find(d => d.id === id);
     if (!doc) return;
     documentEditId = doc.id;
@@ -3535,11 +3669,11 @@
       return;
     }
     if (!confirm("Delete this document?")) return;
-    let documents = loadData(STORAGE_KEYS.documents);
+    let documents = loadLocalData(STORAGE_KEYS.documents);
     const targetDoc = documents.find(doc => doc.id === id);
     if (!targetDoc) return;
     const nextDocs = documents.filter(doc => doc.id !== id);
-    saveData(STORAGE_KEYS.documents, nextDocs);
+    saveLocalData(STORAGE_KEYS.documents, nextDocs);
     if (documentEditId === id) {
       resetDocumentFormFields();
       exitDocumentEditMode();
@@ -3554,9 +3688,9 @@
     const tableWrapper = document.getElementById("dues-table-wrapper");
     renderDuesAmountList();
     if (!yearSelect || !tableWrapper) return;
-    const dues = loadData(STORAGE_KEYS.dues);
+    const dues = loadLocalData(STORAGE_KEYS.dues);
     const amountMap = getDuesAmountMap();
-    const users = loadData(STORAGE_KEYS.users);
+    const users = loadLocalData(STORAGE_KEYS.users);
     const currentYear = new Date().getFullYear();
     let years = Array.from(new Set(dues.map(d => d.year)));
     if (years.length === 0) years = [currentYear];
@@ -3726,8 +3860,8 @@
     const select = document.getElementById("dues-year-select");
     if (!select) return;
     const year = parseInt(select.value, 10) || new Date().getFullYear();
-    const dues = loadData(STORAGE_KEYS.dues).filter(d => d.year === year);
-    const users = loadData(STORAGE_KEYS.users);
+    const dues = loadLocalData(STORAGE_KEYS.dues).filter(d => d.year === year);
+    const users = loadLocalData(STORAGE_KEYS.users);
     const userById = {};
     users.forEach(u => { userById[u.id] = u.name; });
     const amountMap = getDuesAmountMap();
@@ -3776,8 +3910,8 @@
     const select = document.getElementById("dues-year-select");
     if (!select) return;
     const year = parseInt(select.value, 10) || new Date().getFullYear();
-    const dues = loadData(STORAGE_KEYS.dues).filter(d => d.year === year);
-    const users = loadData(STORAGE_KEYS.users);
+    const dues = loadLocalData(STORAGE_KEYS.dues).filter(d => d.year === year);
+    const users = loadLocalData(STORAGE_KEYS.users);
     const amountMap = getDuesAmountMap();
     const yearAmount = amountMap[year];
     const userById = {};
@@ -3908,7 +4042,7 @@
   function renderKingstonDocuments() {
     const listEl = document.getElementById("documents-list");
     if (!listEl) return;
-    const docs = loadData(STORAGE_KEYS.documents)
+    const docs = loadLocalData(STORAGE_KEYS.documents)
       .slice()
       .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
     const user = getFullCurrentUser() || {};
@@ -4006,7 +4140,7 @@
     const isEditing = !!residentDocEditId;
     const isAdminUser = isBoardOrAdmin(user);
     const userLotNumber = parseInt(user.lot, 10);
-    let docs = loadData(STORAGE_KEYS.residentDocuments);
+    let docs = loadLocalData(STORAGE_KEYS.residentDocuments);
     const existing = isEditing ? docs.find(d => d.id === residentDocEditId) : null;
     if (isEditing && !existing) {
       alert("Unable to edit this document. It may have been deleted.");
@@ -4061,7 +4195,7 @@
           docUserId = user.id;
           docUserName = user.name || "Resident";
         } else {
-          const ownerNames = loadData(STORAGE_KEYS.users)
+          const ownerNames = loadLocalData(STORAGE_KEYS.users)
             .filter(u => parseInt(u.lot, 10) === targetLot)
             .map(u => u.name)
             .filter(Boolean);
@@ -4082,7 +4216,7 @@
           createdBy: user.id
         });
       }
-      saveData(STORAGE_KEYS.residentDocuments, docs);
+      saveLocalData(STORAGE_KEYS.residentDocuments, docs);
       const lotLabel = Number.isFinite(targetLot) ? "Lot " + targetLot : "Lot —";
       const actionLabel = isEditing ? "Updated" : "Uploaded";
       logAction(`${actionLabel} resident document "${title}" (${lotLabel})`);
@@ -4108,7 +4242,7 @@
       alert("Please log in to manage resident documents.");
       return;
     }
-    let docs = loadData(STORAGE_KEYS.residentDocuments);
+    let docs = loadLocalData(STORAGE_KEYS.residentDocuments);
     const doc = docs.find(d => d.id === id);
     if (!doc) return;
     const canManage = isBoardOrAdmin(user);
@@ -4123,7 +4257,7 @@
     const lotLabel = Number.isFinite(docLot) ? "Lot " + docLot : "Lot —";
     const title = doc.title || "Resident Document";
     docs = docs.filter(d => d.id !== id);
-    saveData(STORAGE_KEYS.residentDocuments, docs);
+    saveLocalData(STORAGE_KEYS.residentDocuments, docs);
     if (residentDocEditId === id) {
       resetResidentDocForm();
     }
@@ -4137,7 +4271,7 @@
       alert("Please log in to edit resident documents.");
       return;
     }
-    const docs = loadData(STORAGE_KEYS.residentDocuments);
+    const docs = loadLocalData(STORAGE_KEYS.residentDocuments);
     const doc = docs.find(d => d.id === id);
     if (!doc) return;
     const canManage = isBoardOrAdmin(user);
@@ -4189,7 +4323,7 @@
       return;
     }
     const canManage = isBoardOrAdmin(user);
-    const allDocs = loadData(STORAGE_KEYS.residentDocuments)
+    const allDocs = loadLocalData(STORAGE_KEYS.residentDocuments)
       .slice()
       .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
     const lotNumber = parseInt(user.lot, 10);
@@ -4302,7 +4436,7 @@
       return;
     }
     const file = fileInput.files[0] || null;
-    const minutes = loadData(STORAGE_KEYS.minutes);
+    const minutes = loadLocalData(STORAGE_KEYS.minutes);
     const isEditing = !!minutesEditId;
     if (!isEditing && !file) {
       alert("Please attach a minutes file to upload.");
@@ -4342,7 +4476,7 @@
           updatedAt: new Date().toISOString()
         });
       }
-      saveData(STORAGE_KEYS.minutes, minutes);
+      saveLocalData(STORAGE_KEYS.minutes, minutes);
       const actionLabel = isEditing ? "Updated" : "Uploaded";
       logAction(`${actionLabel} minutes "${title}"`);
       resetMinutesFormFields();
@@ -4359,8 +4493,8 @@
   }
 
   function renderMinutes() {
-    const minutes = loadData(STORAGE_KEYS.minutes);
-    const meetings = loadData(STORAGE_KEYS.meetings);
+    const minutes = loadLocalData(STORAGE_KEYS.minutes);
+    const meetings = loadLocalData(STORAGE_KEYS.meetings);
     const target = document.getElementById("minutes-list");
     if (minutes.length === 0) {
       target.textContent = "No minutes have been uploaded yet.";
@@ -4409,11 +4543,11 @@
       alert("Only board or admin can edit minutes.");
       return;
     }
-    const minutes = loadData(STORAGE_KEYS.minutes);
+    const minutes = loadLocalData(STORAGE_KEYS.minutes);
     const record = minutes.find(m => m.id === id);
     if (!record) return;
     minutesEditId = id;
-    const meetings = loadData(STORAGE_KEYS.meetings);
+    const meetings = loadLocalData(STORAGE_KEYS.meetings);
     const meeting = meetings.find(m => m.id === record.meetingId);
     const select = document.getElementById("minutes-meeting-select");
     if (select) {
@@ -4452,11 +4586,11 @@
       return;
     }
     if (!confirm("Delete this minutes entry?")) return;
-    let minutes = loadData(STORAGE_KEYS.minutes);
+    let minutes = loadLocalData(STORAGE_KEYS.minutes);
     const target = minutes.find(m => m.id === id);
     if (!target) return;
     const nextMinutes = minutes.filter(m => m.id !== id);
-    saveData(STORAGE_KEYS.minutes, nextMinutes);
+    saveLocalData(STORAGE_KEYS.minutes, nextMinutes);
     if (minutesEditId === id) {
       resetMinutesFormFields();
       exitMinutesEditMode();
@@ -4481,7 +4615,7 @@
   }
 
   function downloadMinutes(id) {
-    const minutes = loadData(STORAGE_KEYS.minutes);
+    const minutes = loadLocalData(STORAGE_KEYS.minutes);
     const record = minutes.find(m => m.id === id);
     if (!record || !record.fileData) {
       alert("Minutes file not available.");
@@ -4572,7 +4706,7 @@
       reader.readAsDataURL(file);
     })));
     const finalize = newFiles => {
-      let ideas = loadData(STORAGE_KEYS.ideas);
+      let ideas = loadLocalData(STORAGE_KEYS.ideas);
       const isEditing = !!ideaEditId;
       const timestamp = new Date().toISOString();
       if (isEditing) {
@@ -4615,7 +4749,7 @@
         });
         logAction(`Submitted idea "${title}"`);
       }
-      saveData(STORAGE_KEYS.ideas, ideas);
+      saveLocalData(STORAGE_KEYS.ideas, ideas);
       resetIdeaForm();
       renderIdeas();
     };
@@ -4623,8 +4757,8 @@
   }
 
   function renderIdeas() {
-    const ideas = loadData(STORAGE_KEYS.ideas).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-    const users = loadData(STORAGE_KEYS.users);
+    const ideas = loadLocalData(STORAGE_KEYS.ideas).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    const users = loadLocalData(STORAGE_KEYS.users);
     const target = document.getElementById("ideas-list");
     const currentUser = getFullCurrentUser();
     const canManageAll = isBoardOrAdmin(currentUser || {});
@@ -4688,7 +4822,7 @@
       alert("Please log in to edit ideas.");
       return;
     }
-    const ideas = loadData(STORAGE_KEYS.ideas);
+    const ideas = loadLocalData(STORAGE_KEYS.ideas);
     const idea = ideas.find(i => i.id === id);
     if (!idea) return;
     if (idea.userId !== user.id && !isBoardOrAdmin(user)) {
@@ -4734,7 +4868,7 @@
       alert("Please log in to delete ideas.");
       return;
     }
-    let ideas = loadData(STORAGE_KEYS.ideas);
+    let ideas = loadLocalData(STORAGE_KEYS.ideas);
     const idea = ideas.find(i => i.id === id);
     if (!idea) return;
     if (idea.userId !== user.id && !isBoardOrAdmin(user)) {
@@ -4743,7 +4877,7 @@
     }
     if (!confirm("Delete this idea?")) return;
     ideas = ideas.filter(i => i.id !== id);
-    saveData(STORAGE_KEYS.ideas, ideas);
+    saveLocalData(STORAGE_KEYS.ideas, ideas);
     if (ideaEditId === id) {
       resetIdeaForm();
     }
@@ -4762,7 +4896,7 @@
       alert("Please ensure your profile has a valid lot number before voting.");
       return;
     }
-    let ideas = loadData(STORAGE_KEYS.ideas);
+    let ideas = loadLocalData(STORAGE_KEYS.ideas);
     const idea = ideas.find(i => i.id === id);
     if (!idea) return;
     if (!idea.votes) idea.votes = {};
@@ -4772,7 +4906,7 @@
     }
     idea.votes[lotKey] = value;
     idea.updatedAt = new Date().toISOString();
-    saveData(STORAGE_KEYS.ideas, ideas);
+    saveLocalData(STORAGE_KEYS.ideas, ideas);
     logAction(`Voted ${value === 1 ? "up" : "down"} on idea "${idea.title || "Idea"}"`);
     renderIdeas();
   }
@@ -4795,7 +4929,7 @@
       alert("Close date cannot be before open date.");
       return;
     }
-    let votes = loadData(STORAGE_KEYS.votes);
+    let votes = loadLocalData(STORAGE_KEYS.votes);
     const id = "vote_" + Date.now();
     votes.push({
       id,
@@ -4808,7 +4942,7 @@
       lotVotes: {},
       createdAt: new Date().toISOString()
     });
-    saveData(STORAGE_KEYS.votes, votes);
+    saveLocalData(STORAGE_KEYS.votes, votes);
     document.getElementById("vote-topic").value = "";
     document.getElementById("vote-description").value = "";
     document.getElementById("vote-open-date").value = "";
@@ -4823,7 +4957,7 @@
       alert("You must be logged in with a lot assigned.");
       return;
     }
-    let votes = loadData(STORAGE_KEYS.votes);
+    let votes = loadLocalData(STORAGE_KEYS.votes);
     const v = votes.find(x => x.id === voteId);
     if (!v) return;
     const today = new Date().toISOString().slice(0, 10);
@@ -4842,14 +4976,14 @@
     v.lotVotes[lotKey] = value;
     if (value === "yes") v.yes++;
     if (value === "no") v.no++;
-    saveData(STORAGE_KEYS.votes, votes);
+    saveLocalData(STORAGE_KEYS.votes, votes);
     renderVotes();
     renderDashboard();
   }
 
   function renderVotes() {
     const user = getFullCurrentUser() || {};
-    const votes = loadData(STORAGE_KEYS.votes).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    const votes = loadLocalData(STORAGE_KEYS.votes).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
     const today = new Date().toISOString().slice(0, 10);
     const active = votes.filter(v => v.openDate <= today && v.closeDate >= today);
     const closed = votes.filter(v => v.closeDate < today || v.openDate > today);
@@ -4900,7 +5034,7 @@
       alert("Year, category, and amount are required.");
       return;
     }
-    let financials = loadData(STORAGE_KEYS.financials);
+    let financials = loadLocalData(STORAGE_KEYS.financials);
     const id = "fin_" + Date.now();
     financials.push({
       id,
@@ -4911,7 +5045,7 @@
       date,
       description
     });
-    saveData(STORAGE_KEYS.financials, financials);
+    saveLocalData(STORAGE_KEYS.financials, financials);
     document.getElementById("fin-year").value = "";
     document.getElementById("fin-amount").value = "";
     document.getElementById("fin-date").value = "";
@@ -4920,7 +5054,7 @@
   }
 
   function getManualFinancialEntries() {
-    return loadData(STORAGE_KEYS.financials);
+    return loadLocalData(STORAGE_KEYS.financials);
   }
 
   function getBaseFinancialEntries() {
@@ -4952,7 +5086,7 @@
   }
 
   function buildProjectPlannedEntries() {
-    const projects = loadData(STORAGE_KEYS.projects);
+    const projects = loadLocalData(STORAGE_KEYS.projects);
     if (!Array.isArray(projects)) return [];
     return projects
       .filter(project => project && Number.isFinite(project.year))
@@ -4985,7 +5119,7 @@
   }
 
   function buildProjectExpenseEntries() {
-    const projects = loadData(STORAGE_KEYS.projects);
+    const projects = loadLocalData(STORAGE_KEYS.projects);
     if (!Array.isArray(projects)) return [];
     return projects
       .filter(project => project && project.paid && Number.isFinite(project.year))
@@ -5021,7 +5155,7 @@
   }
 
   function buildDuesIncomeEntries() {
-    const dues = loadData(STORAGE_KEYS.dues);
+    const dues = loadLocalData(STORAGE_KEYS.dues);
     if (!Array.isArray(dues) || dues.length === 0) return [];
     const amountMap = getDuesAmountMap();
     const byYear = {};
@@ -5075,7 +5209,7 @@
       }
     });
     balanceForwardOriginalMap = {};
-    const duesAmountYears = loadData(STORAGE_KEYS.duesAmounts)
+    const duesAmountYears = loadLocalData(STORAGE_KEYS.duesAmounts)
       .map(entry => Number(entry.year))
       .filter(year => Number.isFinite(year));
     duesAmountYears.forEach(year => {
@@ -5354,7 +5488,7 @@
     ctx.clearRect(0, 0, width, height);
     const yearSelect = document.getElementById("fin-year-select");
     const year = yearSelect ? parseInt(yearSelect.value, 10) : new Date().getFullYear();
-    const dues = loadData(STORAGE_KEYS.dues).filter(d => d.year === year);
+    const dues = loadLocalData(STORAGE_KEYS.dues).filter(d => d.year === year);
     const amountEntry = getDuesAmountEntry(year);
     const perLotAmount = amountEntry && typeof amountEntry.amount === "number" ? amountEntry.amount : null;
     let paidAmount = 0;
@@ -5740,7 +5874,7 @@
       return;
     }
     const normalizedPlannedCost = Number.isFinite(plannedCost) ? plannedCost : null;
-    let projects = loadData(STORAGE_KEYS.projects);
+    let projects = loadLocalData(STORAGE_KEYS.projects);
     if (projectEditId) {
       const project = projects.find(p => p.id === projectEditId);
       if (!project) {
@@ -5763,7 +5897,7 @@
       const finalizeEdit = () => {
         applyProjectAttachmentEdits(project);
         project.updatedAt = new Date().toISOString();
-        saveData(STORAGE_KEYS.projects, projects);
+        saveLocalData(STORAGE_KEYS.projects, projects);
         resetProjectForm();
         renderProjects();
         renderFinancials();
@@ -5828,7 +5962,7 @@
           actualCost: null,
           createdAt: new Date().toISOString()
         });
-        saveData(STORAGE_KEYS.projects, projects);
+        saveLocalData(STORAGE_KEYS.projects, projects);
         resetProjectForm();
         renderProjects();
         renderFinancials();
@@ -5838,7 +5972,7 @@
   }
 
   function renderProjects() {
-    const projects = loadData(STORAGE_KEYS.projects).sort((a, b) => a.year - b.year);
+    const projects = loadLocalData(STORAGE_KEYS.projects).sort((a, b) => a.year - b.year);
     const target = document.getElementById("projects-list");
     clearProjectFileObjectUrls();
     if (projects.length === 0) {
@@ -5927,7 +6061,7 @@
       alert("Only board or admin can edit projects.");
       return;
     }
-    const projects = loadData(STORAGE_KEYS.projects);
+    const projects = loadLocalData(STORAGE_KEYS.projects);
     const project = projects.find(p => p.id === id);
     if (!project) return;
     projectEditId = project.id;
@@ -5996,7 +6130,7 @@
       checkbox.checked = !checkbox.checked;
       return;
     }
-    let projects = loadData(STORAGE_KEYS.projects);
+    let projects = loadLocalData(STORAGE_KEYS.projects);
     const project = projects.find(p => p.id === id);
     if (!project) return;
     if (checkbox.checked) {
@@ -6024,13 +6158,13 @@
       project.paid = false;
       project.actualCost = null;
     }
-    saveData(STORAGE_KEYS.projects, projects);
+    saveLocalData(STORAGE_KEYS.projects, projects);
     renderProjects();
     renderFinancials();
   }
 
   function downloadProjectAttachment(projectId, kind, index = null) {
-    const projects = loadData(STORAGE_KEYS.projects);
+    const projects = loadLocalData(STORAGE_KEYS.projects);
     const project = projects.find(p => p.id === projectId);
     if (!project) return;
     const isQuote = kind === "quote";
@@ -6102,7 +6236,7 @@
   }
 
   async function exportProjectsWord() {
-    const projects = loadData(STORAGE_KEYS.projects)
+    const projects = loadLocalData(STORAGE_KEYS.projects)
       .slice()
       .sort((a, b) => (a.year || 0) - (b.year || 0));
     if (projects.length === 0) {
@@ -6215,7 +6349,7 @@
 
   function renderUsers() {
     const current = getFullCurrentUser();
-    const users = loadData(STORAGE_KEYS.users);
+    const users = loadLocalData(STORAGE_KEYS.users);
     const pendingDiv = document.getElementById("users-pending-list");
     const allDiv = document.getElementById("users-all-list");
     if (!isSuperAdmin(current)) {
@@ -6269,20 +6403,20 @@
   }
 
   function approveUser(id) {
-    let users = loadData(STORAGE_KEYS.users);
+    let users = loadLocalData(STORAGE_KEYS.users);
     const u = users.find(x => x.id === id);
     if (!u) return;
     u.approved = true;
-    saveData(STORAGE_KEYS.users, users);
+    saveLocalData(STORAGE_KEYS.users, users);
     renderUsers();
   }
 
   function setUserRole(id, role) {
-    let users = loadData(STORAGE_KEYS.users);
+    let users = loadLocalData(STORAGE_KEYS.users);
     const u = users.find(x => x.id === id);
     if (!u) return;
     u.role = role;
-    saveData(STORAGE_KEYS.users, users);
+    saveLocalData(STORAGE_KEYS.users, users);
     renderUsers();
   }
 
@@ -6292,7 +6426,7 @@
       alert("Only the super admin can reset passwords.");
       return;
     }
-    let users = loadData(STORAGE_KEYS.users);
+    let users = loadLocalData(STORAGE_KEYS.users);
     const target = users.find(u => u.id === id);
     if (!target) return;
     if (target.role === "superadmin") {
@@ -6307,7 +6441,7 @@
       return;
     }
     target.password = trimmed;
-    saveData(STORAGE_KEYS.users, users);
+    saveLocalData(STORAGE_KEYS.users, users);
     alert("Password updated for " + (target.name || "the user") + ".");
     renderUsers();
   }
@@ -6320,18 +6454,18 @@
       alert("Enter a new password.");
       return;
     }
-    let users = loadData(STORAGE_KEYS.users);
+    let users = loadLocalData(STORAGE_KEYS.users);
     const u = users.find(x => x.id === user.id);
     if (!u) return;
     u.password = newPass;
-    saveData(STORAGE_KEYS.users, users);
+    saveLocalData(STORAGE_KEYS.users, users);
     document.getElementById("profile-new-password").value = "";
     alert("Password changed. An email notification would be sent in the live system.");
   }
 
   function renderDashboard() {
     const currentUser = getFullCurrentUser();
-    const meetings = loadData(STORAGE_KEYS.meetings).slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    const meetings = loadLocalData(STORAGE_KEYS.meetings).slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""));
     const meetingSummaryEl = document.getElementById("tile-meeting-summary");
     if (meetingSummaryEl) {
       const today = new Date().toISOString().slice(0, 10);
@@ -6346,7 +6480,7 @@
       }
     }
 
-    const votes = loadData(STORAGE_KEYS.votes);
+    const votes = loadLocalData(STORAGE_KEYS.votes);
     const voteSummaryEl = document.getElementById("tile-votes-summary");
     if (voteSummaryEl) {
       const currentYear = new Date().getFullYear();
@@ -6382,7 +6516,7 @@
     const duesSummaryEl = document.getElementById("tile-dues-summary");
     if (duesSummaryEl) {
       const year = new Date().getFullYear();
-      const dues = loadData(STORAGE_KEYS.dues).filter(d => d.year === year);
+      const dues = loadLocalData(STORAGE_KEYS.dues).filter(d => d.year === year);
       const paidLots = dues.filter(d => d.paid).length;
       if (!currentUser) {
         duesSummaryEl.textContent = "Sign in to view status. " + paidLots + " / " + TOTAL_LOTS + " Res. paid.";
@@ -6399,7 +6533,7 @@
 
     const documentsSummaryEl = document.getElementById("tile-documents-summary");
     if (documentsSummaryEl) {
-      const documents = loadData(STORAGE_KEYS.documents);
+      const documents = loadLocalData(STORAGE_KEYS.documents);
       const count = documents.length;
       documentsSummaryEl.textContent = count
         ? count + " document" + (count === 1 ? "" : "s") + " available."
@@ -6409,7 +6543,8 @@
 
   window.addEventListener("beforeunload", clearProjectFileObjectUrls);
 
-  window.onload = function() {
+  window.onload = async function() {
+    await loadData();
     initSuperAdmin();
     if (getFullCurrentUser()) {
       showApp();
