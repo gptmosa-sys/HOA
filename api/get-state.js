@@ -5,6 +5,7 @@ import path from 'path';
 const isVercel = process.env.VERCEL === '1';
 const hasBlobToken = !!process.env.BLOB_READ_WRITE_TOKEN;
 const preferBlob = process.env.PERSIST_MODE === 'blob' || (isVercel && hasBlobToken);
+const blobAccess = process.env.BLOB_ACCESS; // optional: 'public' or 'private'
 const FILE_PATH = isVercel
   ? path.join(process.env.TMPDIR || '/tmp', 'data.json')
   : path.join(process.cwd(), 'data.json');
@@ -25,6 +26,7 @@ async function readFromBlob() {
   console.log('get-state.js: PERSIST_MODE=' + process.env.PERSIST_MODE);
   console.log('get-state.js: BLOB_READ_WRITE_TOKEN exists? ' + !!process.env.BLOB_READ_WRITE_TOKEN);
   console.log('get-state.js: Token length: ' + (process.env.BLOB_READ_WRITE_TOKEN ? process.env.BLOB_READ_WRITE_TOKEN.length : 'missing'));
+  console.log('get-state.js: BLOB_ACCESS=' + (blobAccess || 'unspecified'));
   const meta = await head(BLOB_KEY, {
     token: process.env.BLOB_READ_WRITE_TOKEN
   });

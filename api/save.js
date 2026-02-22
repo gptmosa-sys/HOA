@@ -5,6 +5,7 @@ import path from 'path';
 const isVercel = process.env.VERCEL === '1';
 const hasBlobToken = !!process.env.BLOB_READ_WRITE_TOKEN;
 const preferBlob = process.env.PERSIST_MODE === 'blob' || (isVercel && hasBlobToken);
+const blobAccess = process.env.BLOB_ACCESS; // optional: 'public' or 'private'
 const FILE_PATH = isVercel
   ? path.join(process.env.TMPDIR || '/tmp', 'data.json')
   : path.join(process.cwd(), 'data.json');
@@ -25,11 +26,13 @@ async function saveToBlob(data) {
   console.log('save.js: PERSIST_MODE=' + process.env.PERSIST_MODE);
   console.log('save.js: BLOB_READ_WRITE_TOKEN exists? ' + !!process.env.BLOB_READ_WRITE_TOKEN);
   console.log('save.js: Token length: ' + (process.env.BLOB_READ_WRITE_TOKEN ? process.env.BLOB_READ_WRITE_TOKEN.length : 'missing'));
-  const { url } = await put(BLOB_KEY, JSON.stringify(data), {
-    access: 'private',
+  console.log('save.js: BLOB_ACCESS=' + (blobAccess || 'unspecified'));
+  const putOptions = {
     addRandomSuffix: false,
-    token: process.env.BLOB_READ_WRITE_TOKEN
-  });
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+    access: blobAccess || 'public' // default to public to satisfy private-store requirement
+  };
+  const { url } = await put(BLOB_KEY, JSON.stringify(data), putOptions);
   return { url, mode: 'blob' };
 }
 
