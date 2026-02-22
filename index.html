@@ -1750,7 +1750,7 @@
     <div class="flex-row" style="gap:16px; flex-wrap:wrap;">
       <div style="flex:1; min-width:200px;">
         <label>Upload Quotes (Word / PDF, up to 4)</label>
-        <input type="file" id="proj-quote" accept=".doc,.docx,.pdf" multiple>
+        <input type="file" id="proj-quote" accept=".doc,.docx,.pdf" multiple onchange="handleProjectFileChange('quote')">
         <div class="text-small" id="project-quote-size"></div>
         <div class="attachment-section">
           <div class="text-small">Existing Quotes</div>
@@ -1759,7 +1759,7 @@
       </div>
       <div style="flex:1; min-width:200px;">
         <label>Upload Images (up to 5)</label>
-        <input type="file" id="proj-image" accept="image/*" multiple>
+        <input type="file" id="proj-image" accept="image/*" multiple onchange="handleProjectFileChange('image')">
         <div class="text-small" id="project-image-size"></div>
         <div class="attachment-section">
           <div class="text-small">Existing Images</div>
@@ -3624,6 +3624,12 @@
     });
   }
 
+  async function readFilesAsDataUrls(files) {
+    const arr = Array.from(files || []);
+    const results = await Promise.all(arr.map(readFileAsDataUrl));
+    return arr.map((file, idx) => ({ name: file.name, data: results[idx] || null }));
+  }
+
   // --- Project attachment sizing (quotes/images) ---
   const MAX_QUOTE_TOTAL_BYTES = 15 * 1024 * 1024;  // 15 MB for all quotes
   const MAX_IMAGE_TOTAL_BYTES = 15 * 1024 * 1024;  // 15 MB for all images
@@ -3687,6 +3693,40 @@
       imageLabel.style.fontWeight = over ? "600" : "400";
     }
     return totals;
+  }
+
+  async function handleProjectFileChange(kind) {
+    const quoteInput = document.getElementById("proj-quote");
+    const imgInput = document.getElementById("proj-image");
+    const quoteFiles = quoteInput ? Array.from(quoteInput.files || []) : [];
+    const imageFiles = imgInput ? Array.from(imgInput.files || []) : [];
+    const totals = getProjectAttachmentTotals(quoteFiles, imageFiles);
+
+    if (kind === "quote" && totals.totalQuotes > MAX_QUOTE_TOTAL_BYTES) {
+      alert(`Quotes exceed 15 MB (now ${formatBytes(totals.totalQuotes)}). Remove or choose smaller files.`);
+      if (quoteInput) quoteInput.value = "";
+      updateProjectAttachmentSizes();
+      return;
+    }
+    if (kind === "image" && totals.totalImages > MAX_IMAGE_TOTAL_BYTES) {
+      alert(`Images exceed 15 MB (now ${formatBytes(totals.totalImages)}). Remove or choose smaller files.`);
+      if (imgInput) imgInput.value = "";
+      updateProjectAttachmentSizes();
+      return;
+    }
+
+    if (kind === "quote" && quoteInput) {
+      const newAtt = await readFilesAsDataUrls(quoteInput.files);
+      projectEditQuoteAttachments = projectEditQuoteAttachments.concat(newAtt);
+      quoteInput.value = ""; // clear selection so re-adding same file works
+    }
+    if (kind === "image" && imgInput) {
+      const newAtt = await readFilesAsDataUrls(imgInput.files);
+      projectEditImageAttachments = projectEditImageAttachments.concat(newAtt);
+      imgInput.value = "";
+    }
+    updateProjectAttachmentDisplays();
+    updateProjectAttachmentSizes();
   }
 
   function clearProjectFileObjectUrls() {
