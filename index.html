@@ -785,6 +785,36 @@
     .status-open { background: #28a745; }
     .status-closed { background: #dc3545; }
 
+    .status-overlay {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid #d7dce3;
+      box-shadow: 0 10px 20px rgba(31, 49, 65, 0.15);
+      z-index: 2000;
+      font-size: 0.9rem;
+      color: var(--ink);
+    }
+
+    .status-spinner {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid rgba(31, 49, 65, 0.2);
+      border-top-color: var(--navy);
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
     .pill {
       display: inline-flex;
       padding: 4px 10px;
@@ -1274,6 +1304,11 @@
   </style>
 </head>
 <body>
+
+<div id="app-status" class="status-overlay hidden" aria-live="polite">
+  <span class="status-spinner" aria-hidden="true"></span>
+  <span id="app-status-text">Working…</span>
+</div>
  
 <div id="login-wrapper">
   <div id="login-card">
@@ -2060,6 +2095,28 @@
     }
   }
 
+  let activityCount = 0;
+
+  function setStatusVisible(visible, message) {
+    const statusEl = document.getElementById("app-status");
+    const textEl = document.getElementById("app-status-text");
+    if (!statusEl || !textEl) return;
+    if (message) textEl.textContent = message;
+    statusEl.classList.toggle("hidden", !visible);
+  }
+
+  function beginActivity(message) {
+    activityCount += 1;
+    setStatusVisible(true, message || "Working…");
+  }
+
+  function endActivity() {
+    activityCount = Math.max(0, activityCount - 1);
+    if (activityCount === 0) {
+      setStatusVisible(false);
+    }
+  }
+
   async function saveData() {
     const fullState = {
       users,
@@ -2078,6 +2135,7 @@
       timestamp: new Date().toISOString()
     };
 
+    beginActivity("Saving updates…");
     try {
       const res = await fetch('/api/save', {
         method: 'POST',
@@ -2090,10 +2148,13 @@
     } catch (err) {
       console.error('Blob save error:', err);
       localStorage.setItem('hoa-state', JSON.stringify(fullState));
+    } finally {
+      endActivity();
     }
   }
 
   async function loadData() {
+    beginActivity("Loading latest data…");
     try {
       const res = await fetch('/api/get-state');
       if (!res.ok) throw new Error('No state in Blob: ' + res.status);
@@ -2109,6 +2170,8 @@
         const parsed = JSON.parse(saved);
         applyRemoteData(parsed, "local");
       }
+    } finally {
+      endActivity();
     }
 
     renderDashboard();
@@ -2198,6 +2261,7 @@
   }
 
   async function refreshSectionData(id) {
+    beginActivity("Refreshing latest info…");
     try {
       const res = await fetch("/api/get-state", { cache: "no-store" });
       if (!res.ok) throw new Error("No state in Blob: " + res.status);
@@ -2208,6 +2272,8 @@
     } catch (err) {
       console.warn("Section refresh failed; using cached data", err);
       renderSectionById(id);
+    } finally {
+      endActivity();
     }
   }
 
@@ -3703,20 +3769,25 @@
   }
 
   async function uploadBlobFile(file, scope = "projects") {
-    const res = await fetch("/api/upload-project-file", {
-      method: "POST",
-      headers: {
-        "x-file-name": encodeURIComponent(file.name),
-        "x-upload-scope": scope,
-        "content-type": file.type || "application/octet-stream"
-      },
-      body: file
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error("Upload failed: " + res.status + " " + text);
+    beginActivity(`Uploading ${file.name}…`);
+    try {
+      const res = await fetch("/api/upload-project-file", {
+        method: "POST",
+        headers: {
+          "x-file-name": encodeURIComponent(file.name),
+          "x-upload-scope": scope,
+          "content-type": file.type || "application/octet-stream"
+        },
+        body: file
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error("Upload failed: " + res.status + " " + text);
+      }
+      return await res.json();
+    } finally {
+      endActivity();
     }
-    return res.json();
   }
 
   async function handleProjectFileChange(kind) {
