@@ -2067,8 +2067,14 @@
       projects,
       documents,
       meetings,
+      minutes,
+      ideas,
       votes,
       financials,
+      residentDocuments,
+      duesAmounts,
+      balanceOverrides,
+      actionLog,
       timestamp: new Date().toISOString()
     };
 
@@ -2093,13 +2099,7 @@
       if (!res.ok) throw new Error('No state in Blob: ' + res.status);
       const data = await res.json();
 
-      users      = data.users      || [];
-      dues       = data.dues       || [];
-      projects   = data.projects   || [];
-      documents  = data.documents  || [];
-      meetings   = data.meetings   || [];
-      votes      = data.votes      || [];
-      financials = data.financials || [];
+      applyRemoteData(data, res.headers.get("x-persist-mode") || "blob");
 
       console.log('Loaded shared data from Vercel Blob');
     } catch (err) {
@@ -2107,13 +2107,7 @@
       const saved = localStorage.getItem('hoa-state');
       if (saved) {
         const parsed = JSON.parse(saved);
-        users      = parsed.users      || [];
-        dues       = parsed.dues       || [];
-        projects   = parsed.projects   || [];
-        documents  = parsed.documents  || [];
-        meetings   = parsed.meetings   || [];
-        votes      = parsed.votes      || [];
-        financials = parsed.financials || [];
+        applyRemoteData(parsed, "local");
       }
     }
 
