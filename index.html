@@ -2045,6 +2045,10 @@
   }
 
   function saveLocalData(key, value) {
+    console.debug('[persist] saveLocalData', key, {
+      len: Array.isArray(value) ? value.length : undefined,
+      shared: SHARED_KEYS.has(key)
+    });
     if (SHARED_KEYS.has(key)) {
       setSharedStateRef(key, value);
     }
@@ -2065,8 +2069,14 @@
       projects,
       documents,
       meetings,
+      minutes,
+      ideas,
       votes,
       financials,
+      residentDocuments,
+      duesAmounts,
+      balanceOverrides,
+      actionLog,
       timestamp: new Date().toISOString()
     };
 
@@ -2078,7 +2088,10 @@
       });
 
       if (!res.ok) throw new Error('Save failed: ' + res.status);
-      console.log('Saved to Vercel Blob successfully');
+      const counts = Object.fromEntries(
+        Object.entries(fullState).filter(([k]) => Array.isArray(fullState[k])).map(([k, v]) => [k, v.length])
+      );
+      console.debug('Saved to Vercel Blob successfully', { counts });
     } catch (err) {
       console.error('Blob save error:', err);
       localStorage.setItem('hoa-state', JSON.stringify(fullState));
@@ -2087,31 +2100,21 @@
 
   async function loadData() {
     try {
-      const res = await fetch('/api/get-state');
+      const res = await fetch('/api/get-state', { cache: 'no-store' });
       if (!res.ok) throw new Error('No state in Blob: ' + res.status);
       const data = await res.json();
-
-      users      = data.users      || [];
-      dues       = data.dues       || [];
-      projects   = data.projects   || [];
-      documents  = data.documents  || [];
-      meetings   = data.meetings   || [];
-      votes      = data.votes      || [];
-      financials = data.financials || [];
-
-      console.log('Loaded shared data from Vercel Blob');
+      blobVersion = res.headers.get("x-blob-version") || res.headers.get("etag") || blobVersion;
+      applyRemoteData(data, res.headers.get("x-persist-mode") || "blob");
+      console.debug('Loaded shared data from Vercel Blob', { blobVersion });
     } catch (err) {
       console.warn('Blob load failed → falling back to localStorage', err);
       const saved = localStorage.getItem('hoa-state');
       if (saved) {
         const parsed = JSON.parse(saved);
-        users      = parsed.users      || [];
-        dues       = parsed.dues       || [];
-        projects   = parsed.projects   || [];
-        documents  = parsed.documents  || [];
-        meetings   = parsed.meetings   || [];
-        votes      = parsed.votes      || [];
-        financials = parsed.financials || [];
+        applyRemoteData(parsed, "local");
+        console.debug('Restored from localStorage snapshot');
+      } else {
+        sharedStateLoaded = true; // avoid blocking SHARED_KEYS accesses
       }
     }
 
