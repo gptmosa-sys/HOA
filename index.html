@@ -1641,7 +1641,7 @@
         <input type="text" id="document-title">
         <label>Description</label>
         <textarea id="document-description"></textarea>
-        <label>Upload File</label>
+        <label>Upload File (max 15 MB)</label>
         <input type="file" id="document-file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif">
         <div class="note hidden" id="document-edit-note"></div>
         <div class="flex-row">
@@ -3633,6 +3633,7 @@
   // --- Project attachment sizing (quotes/images) ---
   const MAX_QUOTE_TOTAL_BYTES = 15 * 1024 * 1024;  // 15 MB for all quotes
   const MAX_IMAGE_TOTAL_BYTES = 15 * 1024 * 1024;  // 15 MB for all images
+  const MAX_DOCUMENT_FILE_BYTES = 15 * 1024 * 1024;  // 15 MB per Kingston document
 
   function formatBytes(bytes) {
     if (!Number.isFinite(bytes)) return "0 B";
@@ -3701,11 +3702,12 @@
     return totals;
   }
 
-  async function uploadProjectFile(file) {
+  async function uploadBlobFile(file, scope = "projects") {
     const res = await fetch("/api/upload-project-file", {
       method: "POST",
       headers: {
         "x-file-name": encodeURIComponent(file.name),
+        "x-upload-scope": scope,
         "content-type": file.type || "application/octet-stream"
       },
       body: file
@@ -3739,7 +3741,7 @@
 
     try {
       if (kind === "quote" && quoteInput) {
-        const uploads = await Promise.all(quoteFiles.map(uploadProjectFile));
+        const uploads = await Promise.all(quoteFiles.map(file => uploadBlobFile(file, "projects")));
         const newAtt = uploads.map((uploaded, idx) => ({
           name: quoteFiles[idx].name,
           url: uploaded.url,
@@ -3750,7 +3752,7 @@
         quoteInput.value = "";
       }
       if (kind === "image" && imgInput) {
-        const uploads = await Promise.all(imageFiles.map(uploadProjectFile));
+        const uploads = await Promise.all(imageFiles.map(file => uploadBlobFile(file, "projects")));
         const newAtt = uploads.map((uploaded, idx) => ({
           name: imageFiles[idx].name,
           url: uploaded.url,
@@ -3873,12 +3875,14 @@
       alert("Please choose a file to upload.");
       return;
     }
-    const persist = (fileData, fileName, fileType) => {
+    const persist = ({ fileData, fileName, fileType, fileUrl, fileSize }) => {
       const isUpdating = !!(documentEditId && existing);
       if (isUpdating) {
         existing.title = title;
         existing.description = description;
-        if (fileData) existing.fileData = fileData;
+        if (fileData !== undefined) existing.fileData = fileData;
+        if (fileUrl !== undefined) existing.fileUrl = fileUrl;
+        if (fileSize !== undefined) existing.fileSize = fileSize;
         if (fileName) existing.fileName = fileName;
         if (fileType) existing.fileType = fileType;
         existing.updatedAt = new Date().toISOString();
@@ -3891,6 +3895,8 @@
           fileName,
           fileType,
           fileData,
+          fileUrl,
+          fileSize,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         });
@@ -3904,11 +3910,27 @@
     };
 
     if (file) {
-      readFileAsDataUrl(file).then(dataUrl => {
-        persist(dataUrl, file.name, file.type || "application/octet-stream");
-      }).catch(() => alert("Unable to read file. Please try again."));
-    } else {
-      persist(existing.fileData, existing.fileName, existing.fileType);
+      if (file.size > MAX_DOCUMENT_FILE_BYTES) {
+        alert("Files must be 15 MB or smaller.");
+        return;
+      }
+      uploadBlobFile(file, "documents").then(uploaded => {
+        persist({
+          fileData: null,
+          fileName: file.name,
+          fileType: file.type || "application/octet-stream",
+          fileUrl: uploaded.url,
+          fileSize: Number.isFinite(uploaded.size) ? uploaded.size : file.size
+        });
+      }).catch(() => alert("Unable to upload file. Please try again."));
+    } else if (existing) {
+      persist({
+        fileData: existing.fileData,
+        fileName: existing.fileName,
+        fileType: existing.fileType,
+        fileUrl: existing.fileUrl,
+        fileSize: existing.fileSize
+      });
     }
   }
 
@@ -4328,8 +4350,9 @@
         const description = escapeHtml(doc.description || "No description.");
         const updated = doc.updatedAt ? new Date(doc.updatedAt).toLocaleString() : "";
         const downloadAttr = doc.fileName ? escapeAttr(doc.fileName) : "document";
-        const downloadLink = doc.fileData
-          ? `<a class="document-btn" href="${doc.fileData}" download="${downloadAttr}">Download</a>`
+        const downloadHref = doc.fileUrl || doc.fileData || "";
+        const downloadLink = downloadHref
+          ? `<a class="document-btn" href="${downloadHref}" download="${downloadAttr}" ${doc.fileUrl ? "target=\"_blank\" rel=\"noopener\"" : ""}>Download</a>`
           : "";
         const fileLine = doc.fileName
           ? `<div class="document-meta-line">File: ${escapeHtml(doc.fileName)}</div>`

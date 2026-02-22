@@ -11,12 +11,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const token = process.env.BLOB_FILE_UPLOAD || process.env.BLOB_READ_WRITE_TOKEN;
+  const token = process.env.BLOB_FILE_UPLOAD;
   if (!token) {
-    return res.status(500).json({ error: 'Blob token not configured' });
+    return res.status(500).json({ error: 'BLOB_FILE_UPLOAD is not configured' });
   }
 
   const fileNameHeader = req.headers['x-file-name'];
+  const scopeHeader = req.headers['x-upload-scope'];
+  const rawScope = Array.isArray(scopeHeader) ? scopeHeader[0] : scopeHeader;
+  const scope = (rawScope || 'projects').toString().replace(/[^a-z0-9_-]/gi, '') || 'projects';
   const safeName = fileNameHeader ? decodeURIComponent(fileNameHeader) : 'upload.bin';
   const contentType = req.headers['content-type'] || 'application/octet-stream';
 
@@ -33,7 +36,7 @@ export default async function handler(req, res) {
       return res.status(413).json({ error: 'File too large' });
     }
 
-    const key = `projects/${Date.now()}-${safeName}`;
+    const key = `${scope}/${Date.now()}-${safeName}`;
     const { url, pathname } = await put(key, buffer, {
       access: 'public',
       token,
