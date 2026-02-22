@@ -3624,20 +3624,11 @@
   }
 
   function readFileAsDataUrl(file) {
-    return Promise.resolve().then(() => {
-      if (!file) return null;
-      return new Promise(resolve => {
-        try {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result || null);
-          reader.onerror = () => resolve(null);
-          reader.onabort = () => resolve(null);
-          reader.readAsDataURL(file);
-        } catch (err) {
-          console.warn("FileReader failed", file?.name, err);
-          resolve(null);
-        }
-      });
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
   }
 
@@ -6041,33 +6032,31 @@
         applyProjectAttachmentEdits(project);
         project.updatedAt = new Date().toISOString();
         saveLocalData(STORAGE_KEYS.projects, projects);
-        flushPendingSave();
         resetProjectForm();
         renderProjects();
         renderFinancials();
       };
 
       if (filePromises.length) {
-        Promise.allSettled(filePromises).then(results => {
-          const values = results.map(r => r.status === "fulfilled" ? r.value : null);
+        Promise.all(filePromises).then(results => {
           let resultIndex = 0;
           if (quoteFiles.length) {
             const newQuotes = quoteFiles.map(file => ({
               name: file.name,
-              data: values[resultIndex++] || null
+              data: results[resultIndex++] || null
             }));
             projectEditQuoteAttachments = projectEditQuoteAttachments.concat(newQuotes);
           }
           if (imageFiles.length) {
             const newImages = imageFiles.map(file => ({
               name: file.name,
-              data: values[resultIndex++] || null
+              data: results[resultIndex++] || null
             }));
             projectEditImageAttachments = projectEditImageAttachments.concat(newImages);
           }
           updateProjectAttachmentDisplays();
           finalizeEdit();
-        });
+        }).catch(() => alert("Unable to read attachments. Please try again."));
         return;
       }
       finalizeEdit();
@@ -6076,17 +6065,16 @@
       const filesToRead = [];
       quoteFiles.forEach(file => filesToRead.push(readFileAsDataUrl(file)));
       imageFiles.forEach(file => filesToRead.push(readFileAsDataUrl(file)));
-      Promise.allSettled(filesToRead).then(results => {
-        const values = results.map(r => r.status === "fulfilled" ? r.value : null);
+      Promise.all(filesToRead).then(results => {
         let resultIndex = 0;
         const quotes = quoteFiles.map(file => ({
           name: file.name,
-          data: values[resultIndex++] || null
+          data: results[resultIndex++] || null
         }));
         const primaryQuote = quotes[0] || null;
         const images = imageFiles.map(file => ({
           name: file.name,
-          data: values[resultIndex++] || null
+          data: results[resultIndex++] || null
         }));
         const primaryImage = images[0] || null;
         projects.push({
@@ -6109,11 +6097,10 @@
           createdAt: new Date().toISOString()
         });
         saveLocalData(STORAGE_KEYS.projects, projects);
-        flushPendingSave();
         resetProjectForm();
         renderProjects();
         renderFinancials();
-      });
+      }).catch(() => alert("Unable to read attachments. Please try again."));
       return;
     }
   }
