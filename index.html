@@ -2079,10 +2079,18 @@
     };
 
     try {
+      const payload = JSON.stringify({ data: fullState });
+      const approxBytes = payload.length;
+      if (approxBytes > 3.5 * 1024 * 1024) {
+        console.error("Save skipped: payload too large (~" + (approxBytes / 1024 / 1024).toFixed(2) + " MB). Trim attachments or split saves.");
+        alert("Save is too large (over ~3.5MB). Please remove or shrink attachments and try again.");
+        localStorage.setItem('hoa-state', JSON.stringify(fullState));
+        return;
+      }
       const res = await fetch('/api/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: fullState })
+        body: payload
       });
 
       if (!res.ok) throw new Error('Save failed: ' + res.status);
@@ -3624,12 +3632,39 @@
   }
 
   function readFileAsDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+    return Promise.resolve().then(() => {
+      if (!file) return null;
+      return new Promise(resolve => {
+        try {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result || null);
+          reader.onerror = () => resolve(null);
+          reader.onabort = () => resolve(null);
+          reader.readAsDataURL(file);
+        } catch (err) {
+          console.warn("FileReader failed", file?.name, err);
+          resolve(null);
+        }
+      });
     });
+  }
+
+  const MAX_PROJECT_ATTACHMENT_BYTES = 1.5 * 1024 * 1024; // ~1.5MB per file
+
+  function validateProjectFiles(quoteFiles, imageFiles) {
+    for (const f of quoteFiles) {
+      if (f.size > MAX_PROJECT_ATTACHMENT_BYTES) {
+        alert(`Quote \"${f.name}\" is too large (limit ~1.5MB). Please upload a smaller file.`);
+        return false;
+      }
+    }
+    for (const f of imageFiles) {
+      if (f.size > MAX_PROJECT_ATTACHMENT_BYTES) {
+        alert(`Image \"${f.name}\" is too large (limit ~1.5MB). Please upload a smaller file.`);
+        return false;
+      }
+    }
+    return true;
   }
 
   function clearProjectFileObjectUrls() {
@@ -6003,6 +6038,7 @@
       alert("You can upload up to five images per project.");
       return;
     }
+    if (!validateProjectFiles(quoteFiles, imageFiles)) return;
     if (!name || !Number.isFinite(year) || Number.isNaN(cost)) {
       alert("Name, year, and cost are required.");
       return;
