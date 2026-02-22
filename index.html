@@ -815,6 +815,22 @@
       to { transform: rotate(360deg); }
     }
 
+    .pending-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 6px;
+      margin-left: 8px;
+      border-radius: 999px;
+      background: #c62828;
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 600;
+      line-height: 1;
+    }
+
     .pill {
       display: inline-flex;
       padding: 4px 10px;
@@ -1833,7 +1849,7 @@
     <input type="password" id="profile-new-password" placeholder="New password">
     <button class="primary small" onclick="changePassword()">Change Password</button>
     <div class="note">
-      Password changes trigger an email notification in the real system.
+      Password updates are applied immediately.
     </div>
   </div>
 </div>
@@ -1849,7 +1865,10 @@
     <div class="settings-flyout hidden" id="settings-panel">
       <h4>Quick Actions</h4>
       <button class="primary" type="button" onclick="handleLogout()">Logout</button>
-      <button class="primary small" type="button" onclick="openSection('users')">Manage Users</button>
+      <button class="primary small" type="button" onclick="openSection('users')">
+        Manage Users
+        <span class="pending-badge hidden" id="pending-users-badge" aria-label="Pending approvals"></span>
+      </button>
       <button class="primary small hidden" type="button" id="data-admin-btn" onclick="openDataAdminModal()">Export / Import Data</button>
       <button class="ghost-btn small hidden" type="button" id="view-action-log-btn" onclick="toggleActionLog()">View Action Log</button>
     </div>
@@ -3094,6 +3113,7 @@
     renderDocuments();
     renderDues();
     renderUsers();
+    updatePendingUsersBadge();
   }
 
   function createMeeting() {
@@ -6785,13 +6805,37 @@
       htmlAll += "</td>";
       htmlAll += "<td>";
       if (u.role !== "superadmin") {
-        htmlAll += "<button class='small' onclick=\"resetUserPassword('" + u.id + "')\">Reset Password</button>";
+        htmlAll += "<button class='small' onclick=\"resetUserPassword('" + u.id + "')\">Reset Password</button> ";
+        htmlAll += "<button class='icon-btn' type='button' onclick=\"deleteUser('" + u.id + "')\" aria-label='Delete user'>";
+        htmlAll += "<svg viewBox='0 0 24 24' aria-hidden='true'>";
+        htmlAll += "<path d='M3 6h18'></path>";
+        htmlAll += "<path d='M8 6V4h8v2'></path>";
+        htmlAll += "<path d='M6 6l1 14h10l1-14'></path>";
+        htmlAll += "<path d='M10 11v6'></path>";
+        htmlAll += "<path d='M14 11v6'></path>";
+        htmlAll += "</svg>";
+        htmlAll += "</button>";
       }
       htmlAll += "</td>";
       htmlAll += "</tr>";
     });
     htmlAll += "</table>";
     allDiv.innerHTML = htmlAll;
+    updatePendingUsersBadge();
+  }
+
+  function updatePendingUsersBadge() {
+    const badge = document.getElementById("pending-users-badge");
+    if (!badge) return;
+    const users = loadLocalData(STORAGE_KEYS.users);
+    const pendingCount = users.filter(u => !u.approved && u.role !== "superadmin").length;
+    if (pendingCount > 0) {
+      badge.textContent = String(pendingCount);
+      badge.classList.remove("hidden");
+    } else {
+      badge.textContent = "";
+      badge.classList.add("hidden");
+    }
   }
 
   function approveUser(id) {
@@ -6838,6 +6882,28 @@
     renderUsers();
   }
 
+  function deleteUser(id) {
+    const current = getFullCurrentUser();
+    if (!isSuperAdmin(current)) {
+      alert("Only the super admin can delete users.");
+      return;
+    }
+    let users = loadLocalData(STORAGE_KEYS.users);
+    const target = users.find(u => u.id === id);
+    if (!target) return;
+    if (target.role === "superadmin") {
+      alert("Super admin accounts cannot be deleted.");
+      return;
+    }
+    if (!confirm(`Delete user "${target.name || target.email || "this user"}"?`)) return;
+    users = users.filter(u => u.id !== id);
+    saveLocalData(STORAGE_KEYS.users, users);
+    if (getFullCurrentUser() && getFullCurrentUser().id === id) {
+      clearCurrentUser();
+    }
+    renderUsers();
+  }
+
   function changePassword() {
     const user = getFullCurrentUser();
     if (!user) return;
@@ -6852,7 +6918,7 @@
     u.password = newPass;
     saveLocalData(STORAGE_KEYS.users, users);
     document.getElementById("profile-new-password").value = "";
-    alert("Password changed. An email notification would be sent in the live system.");
+    alert("Password updated.");
   }
 
   function renderDashboard() {
