@@ -1,4 +1,4 @@
-import { get } from '@vercel/blob';
+import { list } from '@vercel/blob';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -8,11 +8,11 @@ export default async function handler(req, res) {
   const key = 'hoa-state.json';
 
   try {
-    const { url } = await get(key, {
-      token: process.env.BLOB_READ_WRITE_TOKEN
-    });
+    const { blobs } = await list({ prefix: key, token: process.env.BLOB_READ_WRITE_TOKEN });
+    const blob = blobs.find(b => b.pathname === key);
+    if (!blob) throw new Error('Blob not found');
 
-    const blobRes = await fetch(url);
+    const blobRes = await fetch(blob.url);
     if (!blobRes.ok) throw new Error('Blob fetch failed');
 
     const data = await blobRes.json();
