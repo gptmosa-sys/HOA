@@ -2412,40 +2412,20 @@
   }
 
   function initSuperAdmin() {
-    ensureDefaultSuperAdmin();
-  }
-
-  function ensureDefaultSuperAdmin() {
     let users = loadLocalData(STORAGE_KEYS.users);
-    const defaultEmail = "admin@example.com";
-    const defaultPass = "admin123";
-    const superUsers = users.filter(u => u.role === "superadmin");
-    if (superUsers.length === 0) {
+    const hasSuper = users.some(u => u.role === "superadmin");
+    if (!hasSuper) {
       users.push({
         id: "user_superadmin_default",
         name: "Super Admin",
-        email: defaultEmail,
-        password: defaultPass,
+        email: "admin@example.com",
+        password: "admin123",
         role: "superadmin",
         lot: "",
         approved: true,
         createdAt: new Date().toISOString()
       });
       saveLocalData(STORAGE_KEYS.users, users);
-      flushPendingSave();
-      return;
-    }
-    // Repair missing credentials on existing super admin
-    const updated = superUsers.map(u => {
-      if (!u.email) u.email = defaultEmail;
-      if (!u.password) u.password = defaultPass;
-      return u;
-    });
-    // Only write if we changed anything
-    const changed = updated.some((u, idx) => u !== superUsers[idx] || !superUsers[idx].email || !superUsers[idx].password);
-    if (changed) {
-      saveLocalData(STORAGE_KEYS.users, users);
-      flushPendingSave();
     }
   }
 
@@ -2472,26 +2452,8 @@
       alert("Enter your email and password.");
       return;
     }
-    // Always ensure default super admin exists before checking credentials
-    ensureDefaultSuperAdmin();
     const users = loadLocalData(STORAGE_KEYS.users);
     const user = users.find(u => (u.email || "").toLowerCase() === email);
-    // Allow hard reset of super admin credentials if user typed default pair
-    if (!user && email === "admin@example.com" && password === "admin123") {
-      users.push({
-        id: "user_superadmin_default_" + Date.now(),
-        name: "Super Admin",
-        email: "admin@example.com",
-        password: "admin123",
-        role: "superadmin",
-        lot: "",
-        approved: true,
-        createdAt: new Date().toISOString()
-      });
-      saveLocalData(STORAGE_KEYS.users, users);
-      flushPendingSave();
-      return handleLogin(); // retry with seeded user
-    }
     if (!user || user.password !== password) {
       alert("Invalid email or password.");
       return;
