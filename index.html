@@ -512,6 +512,103 @@
       margin-top: 0;
     }
 
+    .user-action-group {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .user-actions {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: stretch;
+      width: auto;
+    }
+
+    .user-action-row {
+      display: flex;
+      justify-content: flex-start;
+      gap: 8px;
+      width: auto;
+    }
+
+    .user-action-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background: #eef2f5;
+      border: 1px solid rgba(31, 49, 65, 0.15);
+    }
+
+    .user-action-icon svg {
+      width: 18px;
+      height: 18px;
+      stroke: #1f3141;
+      stroke-width: 1.9;
+    }
+
+    .user-action-icon.danger {
+      background: #f9e2e1;
+      border-color: rgba(178, 60, 23, 0.35);
+    }
+
+    .user-action-icon.danger svg {
+      stroke: #b23c17;
+    }
+
+    .user-action-btn {
+      background: #223349;
+      color: #fff;
+      border: 1px solid rgba(31, 49, 65, 0.4);
+      padding: 4px 8px;
+      border-radius: 9px;
+      font-weight: 600;
+      min-height: 0;
+      font-size: 0.66rem;
+      width: auto;
+    }
+
+    .role-actions {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: stretch;
+      width: 77px;
+    }
+
+    .role-btn {
+      min-height: 30px;
+      border-radius: 9px;
+      font-weight: 600;
+      font-size: 0.66rem;
+      border: 1px solid transparent;
+    }
+
+    .role-btn-resident {
+      background: #e7f0ea;
+      color: #1b5a36;
+      border-color: #b7d0c2;
+    }
+
+    .role-btn-board {
+      background: #f1e6d6;
+      color: #6b4b1e;
+      border-color: #d9c2a4;
+    }
+
+    .user-actions-cell {
+      width: 88px;
+    }
+
+    .lot-cell {
+      text-align: center;
+    }
+
+    th.center {
+      text-align: center;
+    }
+
     .match-height {
       display: inline-flex;
       align-items: center;
@@ -6876,7 +6973,7 @@
       allDiv.textContent = "No users.";
       return;
     }
-    let htmlAll = "<table><tr><th>Name</th><th>Email</th><th>Lot</th><th>Role</th><th>Status</th><th>Board Role</th><th>Set Role</th><th>Actions</th></tr>";
+    let htmlAll = "<table><tr><th>Name</th><th>Email</th><th class='center'>Lot</th><th class='center'>Role</th><th class='center'>Status</th><th class='center'>Board Role</th><th class='center'>Set Role</th><th class='center'>Actions</th></tr>";
     approvedUsers.forEach(u => {
       htmlAll += "<tr>";
       const isEditing = !!userEditStates[u.id];
@@ -6888,7 +6985,7 @@
       htmlAll += "<input type='text' id='user-email-" + u.id + "' value='" + escapeAttr(u.email || "") + "' ";
       htmlAll += (isEditing ? "" : "disabled ") + "class='text-small' style='width:200px;'>";
       htmlAll += "</td>";
-      htmlAll += "<td>" + (u.lot || "") + "</td>";
+      htmlAll += "<td class='lot-cell'>" + (u.lot || "") + "</td>";
       htmlAll += "<td>" + u.role + "</td>";
       htmlAll += "<td>" + (u.approved ? "Approved" : "Pending") + "</td>";
       htmlAll += "<td>";
@@ -6904,14 +7001,17 @@
       htmlAll += "</td>";
       htmlAll += "<td>";
       if (isSuper && u.role !== "superadmin") {
-        htmlAll += "<button class='small' onclick=\"setUserRole('" + u.id + "','resident')\">Resident</button> ";
-        htmlAll += "<button class='small' onclick=\"setUserRole('" + u.id + "','board')\">Board</button>";
+        htmlAll += "<div class='role-actions'>";
+        htmlAll += "<button class='small role-btn role-btn-resident' onclick=\"setUserRole('" + u.id + "','resident')\">Resident</button>";
+        htmlAll += "<button class='small role-btn role-btn-board' onclick=\"setUserRole('" + u.id + "','board')\">Board</button>";
+        htmlAll += "</div>";
       }
-    htmlAll += "</td>";
-    htmlAll += "<td>";
+      htmlAll += "</td>";
+      htmlAll += "<td class='user-actions-cell'>";
       if (isSuper && u.role !== "superadmin") {
-        htmlAll += "<span style='display:inline-flex; gap:6px; align-items:center;'>";
-        htmlAll += "<button class='icon-btn' type='button' onclick=\"toggleUserEdit('" + u.id + "')\" aria-label='Edit user'>";
+        htmlAll += "<div class='user-actions'>";
+        htmlAll += "<div class='user-action-row'>";
+        htmlAll += "<button class='icon-btn user-action-icon' type='button' onclick=\"toggleUserEdit('" + u.id + "')\" aria-label='Edit user'>";
         if (isEditing) {
           htmlAll += "<svg viewBox='0 0 24 24' aria-hidden='true'>";
           htmlAll += "<rect x='4' y='10' width='16' height='10' rx='2'></rect>";
@@ -6924,7 +7024,7 @@
           htmlAll += "</svg>";
         }
         htmlAll += "</button>";
-        htmlAll += "<button class='icon-btn' type='button' onclick=\"deleteUser('" + u.id + "')\" aria-label='Delete user'>";
+        htmlAll += "<button class='icon-btn user-action-icon danger' type='button' onclick=\"deleteUser('" + u.id + "')\" aria-label='Delete user'>";
         htmlAll += "<svg viewBox='0 0 24 24' aria-hidden='true'>";
         htmlAll += "<path d='M3 6h18'></path>";
         htmlAll += "<path d='M8 6V4h8v2'></path>";
@@ -6933,8 +7033,9 @@
         htmlAll += "<path d='M14 11v6'></path>";
         htmlAll += "</svg>";
         htmlAll += "</button>";
-        htmlAll += "</span> ";
-        htmlAll += "<button class='small' onclick=\"resetUserPassword('" + u.id + "')\">Reset Password</button>";
+        htmlAll += "</div>";
+        htmlAll += "<button class='small user-action-btn' onclick=\"resetUserPassword('" + u.id + "')\">Reset Password</button>";
+        htmlAll += "</div>";
       }
       htmlAll += "</td>";
       htmlAll += "</tr>";
