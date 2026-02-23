@@ -6744,8 +6744,10 @@
     const users = loadLocalData(STORAGE_KEYS.users);
     const pendingDiv = document.getElementById("users-pending-list");
     const allDiv = document.getElementById("users-all-list");
-    if (!isSuperAdmin(current)) {
-      pendingDiv.textContent = "Only super admin can manage users.";
+    const canManage = isBoardOrAdmin(current);
+    const isSuper = isSuperAdmin(current);
+    if (!canManage) {
+      pendingDiv.textContent = "Only board or super admin can manage users.";
       allDiv.textContent = "";
       return;
     }
@@ -6759,7 +6761,10 @@
         html += "<td>" + u.name + "</td>";
         html += "<td>" + u.email + "</td>";
         html += "<td>" + (u.lot || "") + "</td>";
-        html += "<td><button class='small primary' onclick=\"approveUser('" + u.id + "')\">Approve</button></td>";
+        html += "<td>";
+        html += "<button class='small primary' onclick=\"approveUser('" + u.id + "')\">Approve</button> ";
+        html += "<button class='small' onclick=\"denyUser('" + u.id + "')\">Deny</button>";
+        html += "</td>";
         html += "</tr>";
       });
       html += "</table>";
@@ -6775,18 +6780,27 @@
       htmlAll += "<td>" + u.name + "</td>";
       htmlAll += "<td>" + u.email + "</td>";
       htmlAll += "<td>" + (u.lot || "") + "</td>";
-      htmlAll += "<td>" + u.role + "</td>";
-      htmlAll += "<td>" + (u.approved ? "Approved" : "Pending") + "</td>";
-      htmlAll += "<td>";
-      if (u.role !== "superadmin") {
-        htmlAll += "<button class='small' onclick=\"setUserRole('" + u.id + "','resident')\">Resident</button> ";
-        htmlAll += "<button class='small' onclick=\"setUserRole('" + u.id + "','board')\">Board</button>";
-      }
-      htmlAll += "</td>";
-      htmlAll += "<td>";
-      if (u.role !== "superadmin") {
-        htmlAll += "<button class='small' onclick=\"resetUserPassword('" + u.id + "')\">Reset Password</button>";
-      }
+    htmlAll += "<td>" + u.role + "</td>";
+    htmlAll += "<td>" + (u.approved ? "Approved" : "Pending") + "</td>";
+    htmlAll += "<td>";
+    if (isSuper && u.role !== "superadmin") {
+      htmlAll += "<button class='small' onclick=\"setUserRole('" + u.id + "','resident')\">Resident</button> ";
+      htmlAll += "<button class='small' onclick=\"setUserRole('" + u.id + "','board')\">Board</button>";
+    }
+    htmlAll += "</td>";
+    htmlAll += "<td>";
+    if (isSuper && u.role !== "superadmin") {
+      htmlAll += "<button class='small' onclick=\"resetUserPassword('" + u.id + "')\">Reset Password</button> ";
+      htmlAll += "<button class='icon-btn' type='button' onclick=\"deleteUser('" + u.id + "')\" aria-label='Delete user'>";
+      htmlAll += "<svg viewBox='0 0 24 24' aria-hidden='true'>";
+      htmlAll += "<path d='M3 6h18'></path>";
+      htmlAll += "<path d='M8 6V4h8v2'></path>";
+      htmlAll += "<path d='M6 6l1 14h10l1-14'></path>";
+      htmlAll += "<path d='M10 11v6'></path>";
+      htmlAll += "<path d='M14 11v6'></path>";
+      htmlAll += "</svg>";
+      htmlAll += "</button>";
+    }
       htmlAll += "</td>";
       htmlAll += "</tr>";
     });
@@ -6799,6 +6813,21 @@
     const u = users.find(x => x.id === id);
     if (!u) return;
     u.approved = true;
+    saveLocalData(STORAGE_KEYS.users, users);
+    renderUsers();
+  }
+
+  function denyUser(id) {
+    const current = getFullCurrentUser();
+    if (!isBoardOrAdmin(current)) {
+      alert("Only board or super admin can deny users.");
+      return;
+    }
+    let users = loadLocalData(STORAGE_KEYS.users);
+    const target = users.find(u => u.id === id);
+    if (!target) return;
+    if (!confirm(`Deny and remove "${target.name || target.email || "this user"}"?`)) return;
+    users = users.filter(u => u.id !== id);
     saveLocalData(STORAGE_KEYS.users, users);
     renderUsers();
   }
@@ -6835,6 +6864,28 @@
     target.password = trimmed;
     saveLocalData(STORAGE_KEYS.users, users);
     alert("Password updated for " + (target.name || "the user") + ".");
+    renderUsers();
+  }
+
+  function deleteUser(id) {
+    const current = getFullCurrentUser();
+    if (!isSuperAdmin(current)) {
+      alert("Only the super admin can delete users.");
+      return;
+    }
+    let users = loadLocalData(STORAGE_KEYS.users);
+    const target = users.find(u => u.id === id);
+    if (!target) return;
+    if (target.role === "superadmin") {
+      alert("Super admin accounts cannot be deleted.");
+      return;
+    }
+    if (!confirm(`Delete user "${target.name || target.email || "this user"}"?`)) return;
+    users = users.filter(u => u.id !== id);
+    saveLocalData(STORAGE_KEYS.users, users);
+    if (getFullCurrentUser() && getFullCurrentUser().id === id) {
+      clearCurrentUser();
+    }
     renderUsers();
   }
 
