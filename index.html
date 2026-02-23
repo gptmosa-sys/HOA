@@ -146,11 +146,23 @@
       display: flex;
       gap: 12px;
       margin-top: 12px;
+      align-items: stretch;
     }
 
     .reg-actions button {
       flex: 1;
-      min-height: 44px;
+      min-height: 46px;
+      height: 46px;
+      padding: 0 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .reg-actions .primary,
+    .reg-actions .ghost-btn {
+      margin-top: 0;
     }
 
     .lot-map-image {
@@ -159,6 +171,30 @@
       border-radius: 12px;
       border: 1px solid rgba(31, 49, 65, 0.15);
       display: block;
+      transform-origin: center;
+      cursor: grab;
+    }
+
+    .lot-map-viewport {
+      position: relative;
+      overflow: hidden;
+      border-radius: 12px;
+      border: 1px solid rgba(31, 49, 65, 0.15);
+      background: #f6f2ea;
+      max-height: 70vh;
+      touch-action: none;
+    }
+
+    .lot-map-controls {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .lot-map-range {
+      width: min(360px, 100%);
     }
 
     textarea {
@@ -2071,7 +2107,13 @@
         </svg>
       </button>
     </div>
-    <img class="lot-map-image" src="lots.PNG" alt="Lot map">
+    <div class="lot-map-viewport" id="lot-map-viewport">
+      <img class="lot-map-image" id="lot-map-image" src="lots.PNG" alt="Lot map">
+    </div>
+    <div class="lot-map-controls">
+      <span class="text-small">Zoom</span>
+      <input class="lot-map-range" id="lot-map-zoom" type="range" min="1" max="3" step="0.05" value="1">
+    </div>
   </div>
 </div>
 
@@ -2144,6 +2186,15 @@
   let lotMapListenerAttached = false;
   let userSortKey = "name";
   const userEditStates = {};
+  const lotMapState = {
+    scale: 1,
+    translateX: 0,
+    translateY: 0,
+    dragging: false,
+    lastX: 0,
+    lastY: 0,
+    listenersAttached: false
+  };
   let logoDataUrlCache = null;
 
   let users = [];
@@ -3146,11 +3197,64 @@
   function openLotMap() {
     ensureDataAdminRefs();
     if (lotMapModal) lotMapModal.classList.remove("hidden");
+    initLotMap();
   }
 
   function closeLotMap() {
     ensureDataAdminRefs();
     if (lotMapModal) lotMapModal.classList.add("hidden");
+  }
+
+  function initLotMap() {
+    const img = document.getElementById("lot-map-image");
+    const viewport = document.getElementById("lot-map-viewport");
+    const zoom = document.getElementById("lot-map-zoom");
+    if (!img || !viewport || !zoom) return;
+
+    if (!lotMapState.listenersAttached) {
+      lotMapState.listenersAttached = true;
+      zoom.addEventListener("input", () => {
+        lotMapState.scale = parseFloat(zoom.value) || 1;
+        applyLotMapTransform();
+      });
+
+      img.addEventListener("pointerdown", event => {
+        event.preventDefault();
+        lotMapState.dragging = true;
+        lotMapState.lastX = event.clientX;
+        lotMapState.lastY = event.clientY;
+        img.style.cursor = "grabbing";
+      });
+
+      window.addEventListener("pointermove", event => {
+        if (!lotMapState.dragging) return;
+        const dx = event.clientX - lotMapState.lastX;
+        const dy = event.clientY - lotMapState.lastY;
+        lotMapState.lastX = event.clientX;
+        lotMapState.lastY = event.clientY;
+        lotMapState.translateX += dx;
+        lotMapState.translateY += dy;
+        applyLotMapTransform();
+      });
+
+      window.addEventListener("pointerup", () => {
+        if (!lotMapState.dragging) return;
+        lotMapState.dragging = false;
+        img.style.cursor = "grab";
+      });
+    }
+
+    lotMapState.scale = 1;
+    lotMapState.translateX = 0;
+    lotMapState.translateY = 0;
+    zoom.value = "1";
+    applyLotMapTransform();
+  }
+
+  function applyLotMapTransform() {
+    const img = document.getElementById("lot-map-image");
+    if (!img) return;
+    img.style.transform = `translate(${lotMapState.translateX}px, ${lotMapState.translateY}px) scale(${lotMapState.scale})`;
   }
 
   function resetDataImport() {
