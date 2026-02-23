@@ -1166,6 +1166,11 @@
       font-size: 0.95rem;
     }
 
+    .idea-action-btn {
+      min-width: 72px;
+      text-align: center;
+    }
+
     .primary.match-height {
       margin-top: 0;
     }
@@ -5505,10 +5510,10 @@
       const canDelete = currentUser && (canManageAll || i.userId === currentUser.id);
       const actionButtons = [];
       if (canEdit) {
-        actionButtons.push(`<button class="ghost-btn tiny" type="button" onclick="startIdeaEdit('${i.id}')">Edit</button>`);
+        actionButtons.push(`<button class="ghost-btn tiny idea-action-btn" type="button" onclick="startIdeaEdit('${i.id}')">Edit</button>`);
       }
       if (canDelete) {
-        actionButtons.push(`<button class="ghost-btn tiny" type="button" onclick="deleteIdea('${i.id}')">Delete</button>`);
+        actionButtons.push(`<button class="ghost-btn tiny idea-action-btn" type="button" onclick="deleteIdea('${i.id}')">Delete</button>`);
       }
       const actions = actionButtons.length ? actionButtons.join(" ") : "—";
       const descriptionHtml = escapeHtml(i.description || "").replace(/\n/g, "<br>");
