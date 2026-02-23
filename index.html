@@ -786,27 +786,28 @@
 
     .status-overlay {
       position: fixed;
-      top: 18px;
-      right: 18px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      padding: 10px 14px;
+      padding: 12px 18px;
       border-radius: 999px;
-      background: #fff;
-      border: 1px solid #d7dce3;
-      box-shadow: 0 10px 20px rgba(31, 49, 65, 0.15);
+      background: var(--navy);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 18px 30px rgba(31, 49, 65, 0.25);
       z-index: 2000;
       font-size: 0.9rem;
-      color: var(--ink);
+      color: #fff;
     }
 
     .status-spinner {
       width: 14px;
       height: 14px;
       border-radius: 50%;
-      border: 2px solid rgba(31, 49, 65, 0.2);
-      border-top-color: var(--navy);
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      border-top-color: #fff;
       animation: spin 0.8s linear infinite;
     }
 
@@ -2136,6 +2137,7 @@
   }
 
   let activityCount = 0;
+  let statusHideTimer = null;
 
   function setStatusVisible(visible, message) {
     const statusEl = document.getElementById("app-status");
@@ -2146,6 +2148,10 @@
   }
 
   function beginActivity(message) {
+    if (statusHideTimer) {
+      clearTimeout(statusHideTimer);
+      statusHideTimer = null;
+    }
     activityCount += 1;
     setStatusVisible(true, message || "Working…");
   }
@@ -2153,7 +2159,12 @@
   function endActivity() {
     activityCount = Math.max(0, activityCount - 1);
     if (activityCount === 0) {
-      setStatusVisible(false);
+      statusHideTimer = setTimeout(() => {
+        if (activityCount === 0) {
+          setStatusVisible(false);
+        }
+        statusHideTimer = null;
+      }, 2500);
     }
   }
 
