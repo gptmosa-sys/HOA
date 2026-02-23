@@ -1176,6 +1176,13 @@
       white-space: nowrap;
     }
 
+    #ideas-list .idea-actions-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: stretch;
+    }
+
     .primary.match-height {
       margin-top: 0;
     }
@@ -5520,7 +5527,9 @@
       if (canDelete) {
         actionButtons.push(`<button class="ghost-btn tiny idea-action-btn" type="button" onclick="deleteIdea('${i.id}')">Delete</button>`);
       }
-      const actions = actionButtons.length ? actionButtons.join(" ") : "—";
+      const actions = actionButtons.length
+        ? `<div class="idea-actions-stack">${actionButtons.join("")}</div>`
+        : "—";
       const descriptionHtml = escapeHtml(i.description || "").replace(/\n/g, "<br>");
       html += "<tr>";
       html += "<td>" + escapeHtml(i.title) + "</td>";
