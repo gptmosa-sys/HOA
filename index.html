@@ -1176,6 +1176,18 @@
       white-space: nowrap;
     }
 
+    #ideas-list .votes-col {
+      width: 1%;
+      white-space: nowrap;
+    }
+
+    #ideas-list .vote-controls {
+      flex-direction: column;
+      gap: 6px;
+      align-items: stretch;
+      flex-wrap: nowrap;
+    }
+
     #ideas-list .idea-actions-stack {
       display: flex;
       flex-direction: column;
@@ -5510,7 +5522,7 @@
       target.textContent = "No ideas submitted yet.";
       return;
     }
-    let html = "<table><tr><th>Title</th><th>Description</th><th>Resident</th><th>Date</th><th>Cost</th><th>Files</th><th>Votes</th><th class='actions-col'>Actions</th></tr>";
+    let html = "<table><tr><th>Title</th><th>Description</th><th>Resident</th><th>Date</th><th>Cost</th><th>Files</th><th class='votes-col'>Votes</th><th class='actions-col'>Actions</th></tr>";
     ideas.forEach(i => {
       const user = users.find(u => u.id === i.userId);
       const lotText = user && user.lot ? "Lot " + escapeHtml(String(user.lot)) : "Lot —";
@@ -5551,7 +5563,7 @@
         if (vote === -1) totals.down += 1;
         return totals;
       }, { up: 0, down: 0 });
-      html += `<td>
+      html += `<td class="votes-col">
         <div class="vote-controls">
           <button class="ghost-btn tiny" type="button" onclick="voteIdea('${i.id}', 1)">👍 ${counts.up}</button>
           <button class="ghost-btn tiny" type="button" onclick="voteIdea('${i.id}', -1)">👎 ${counts.down}</button>
