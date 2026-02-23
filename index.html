@@ -1171,6 +1171,11 @@
       text-align: center;
     }
 
+    #ideas-list .actions-col {
+      width: 1%;
+      white-space: nowrap;
+    }
+
     .primary.match-height {
       margin-top: 0;
     }
@@ -5498,7 +5503,7 @@
       target.textContent = "No ideas submitted yet.";
       return;
     }
-    let html = "<table><tr><th>Title</th><th>Description</th><th>Resident</th><th>Date</th><th>Cost</th><th>Files</th><th>Votes</th><th>Actions</th></tr>";
+    let html = "<table><tr><th>Title</th><th>Description</th><th>Resident</th><th>Date</th><th>Cost</th><th>Files</th><th>Votes</th><th class='actions-col'>Actions</th></tr>";
     ideas.forEach(i => {
       const user = users.find(u => u.id === i.userId);
       const lotText = user && user.lot ? "Lot " + escapeHtml(String(user.lot)) : "Lot —";
@@ -5543,7 +5548,7 @@
           <button class="ghost-btn tiny" type="button" onclick="voteIdea('${i.id}', -1)">👎 ${counts.down}</button>
         </div>
       </td>`;
-      html += "<td>" + actions + "</td>";
+      html += "<td class='actions-col'>" + actions + "</td>";
       html += "</tr>";
     });
     html += "</table>";
