@@ -142,6 +142,25 @@
       color: #fff;
     }
 
+    .reg-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .reg-actions button {
+      flex: 1;
+      min-height: 44px;
+    }
+
+    .lot-map-image {
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(31, 49, 65, 0.15);
+      display: block;
+    }
+
     textarea {
       resize: vertical;
       min-height: 80px;
@@ -1435,7 +1454,10 @@
       <input type="number" id="reg-lot" min="1" max="999">
       <label>Password</label>
       <input type="password" id="reg-password">
-      <button class="primary" onclick="handleRegister()">Submit Registration</button>
+      <div class="reg-actions">
+        <button class="primary" onclick="handleRegister()">Submit Registration</button>
+        <button class="ghost-btn" type="button" onclick="openLotMap()">Lot Map</button>
+      </div>
       <div class="note">
         Registration requires admin approval before you can log in.
       </div>
@@ -2038,6 +2060,21 @@
   </main>
 </div>
 
+<div class="modal-overlay hidden" id="lot-map-modal" role="dialog" aria-modal="true" aria-labelledby="lot-map-title">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h4 id="lot-map-title">Lot Map</h4>
+      <button class="icon-btn" type="button" aria-label="Close" onclick="closeLotMap()">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <line x1="5" y1="5" x2="19" y2="19"></line>
+          <line x1="19" y1="5" x2="5" y2="19"></line>
+        </svg>
+      </button>
+    </div>
+    <img class="lot-map-image" src="lots.PNG" alt="Lot map">
+  </div>
+</div>
+
 <script>
   const STORAGE_KEYS = {
     users: "hoa_users",
@@ -2098,11 +2135,13 @@
   let settingsListenersInitialized = false;
   let dataAdminModal = null;
   let boardMembersModal = null;
+  let lotMapModal = null;
   let dataYearSelect = null;
   let dataImportStatus = null;
   let dataImportInput = null;
   let dataModalListenerAttached = false;
   let boardModalListenerAttached = false;
+  let lotMapListenerAttached = false;
   let userSortKey = "name";
   const userEditStates = {};
   let logoDataUrlCache = null;
@@ -3013,6 +3052,7 @@
   function ensureDataAdminRefs() {
     if (!dataAdminModal) dataAdminModal = document.getElementById("data-admin-modal");
     if (!boardMembersModal) boardMembersModal = document.getElementById("board-members-modal");
+    if (!lotMapModal) lotMapModal = document.getElementById("lot-map-modal");
     if (!dataYearSelect) dataYearSelect = document.getElementById("data-year-select");
     if (!dataImportStatus) dataImportStatus = document.getElementById("data-import-status");
     if (!dataImportInput) dataImportInput = document.getElementById("data-import-file");
@@ -3026,6 +3066,12 @@
       boardModalListenerAttached = true;
       boardMembersModal.addEventListener("click", event => {
         if (event.target === boardMembersModal) closeBoardMembersModal();
+      });
+    }
+    if (lotMapModal && !lotMapListenerAttached) {
+      lotMapListenerAttached = true;
+      lotMapModal.addEventListener("click", event => {
+        if (event.target === lotMapModal) closeLotMap();
       });
     }
   }
@@ -3095,6 +3141,16 @@
   function closeBoardMembersModal() {
     ensureDataAdminRefs();
     if (boardMembersModal) boardMembersModal.classList.add("hidden");
+  }
+
+  function openLotMap() {
+    ensureDataAdminRefs();
+    if (lotMapModal) lotMapModal.classList.remove("hidden");
+  }
+
+  function closeLotMap() {
+    ensureDataAdminRefs();
+    if (lotMapModal) lotMapModal.classList.add("hidden");
   }
 
   function resetDataImport() {
