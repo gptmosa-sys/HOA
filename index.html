@@ -1825,13 +1825,30 @@
     <h3>Pending Registrations</h3>
     <div id="users-pending-list" class="text-small"></div>
     <h3>All Users</h3>
+    <div class="flex-row" style="gap:8px; align-items:center; margin-bottom:8px;">
+      <span class="text-small" style="text-transform:uppercase; letter-spacing:0.08em;">Sort by</span>
+      <select id="users-sort" class="text-small" onchange="setUsersSort(this.value)">
+        <option value="name">Name</option>
+        <option value="lot">Lot</option>
+        <option value="role">Role</option>
+      </select>
+    </div>
     <div id="users-all-list" class="text-small"></div>
   </div>
-  <div class="card">
+  <div class="card" id="profile-card">
     <h2>Profile</h2>
+    <label>Name</label>
+    <input type="text" id="profile-name">
+    <label>Email</label>
+    <input type="text" id="profile-email">
+    <label>Lot Number</label>
+    <input type="text" id="profile-lot" disabled>
     <label>Change Password</label>
     <input type="password" id="profile-new-password" placeholder="New password">
+    <label>Confirm Password</label>
+    <input type="password" id="profile-confirm-password" placeholder="Confirm password">
     <button class="primary small" onclick="changePassword()">Change Password</button>
+    <button class="primary small" onclick="saveProfileDetails()">Save Profile</button>
     <div class="note">
       Password changes trigger an email notification in the real system.
     </div>
@@ -1845,11 +1862,16 @@
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a6.94 6.94 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 14.9 2h-3.8a.5.5 0 0 0-.49.41l-.36 2.54c-.6.24-1.14.56-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L3.7 8.47a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L3.82 15.15a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.39.32.61.22l2.39-.96c.49.38 1.03.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.41h3.8a.5.5 0 0 0 .49-.41l.36-2.54c.6-.24 1.14-.56 1.63-.94l2.39.96c.23.09.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" fill="currentColor"></path>
       </svg>
+      <span class="notification-dot hidden" id="settings-alert-dot" aria-hidden="true"></span>
     </button>
     <div class="settings-flyout hidden" id="settings-panel">
       <h4>Quick Actions</h4>
       <button class="primary" type="button" onclick="handleLogout()">Logout</button>
-      <button class="primary small" type="button" onclick="openSection('users')">Manage Users</button>
+      <button class="primary small" type="button" onclick="openSection('users')">
+        Manage Users
+        <span class="pending-badge hidden" id="pending-users-badge" aria-label="Pending approvals"></span>
+      </button>
+      <button class="primary small" type="button" onclick="openBoardMembersModal()">Board Members</button>
       <button class="primary small hidden" type="button" id="data-admin-btn" onclick="openDataAdminModal()">Export / Import Data</button>
       <button class="ghost-btn small hidden" type="button" id="view-action-log-btn" onclick="toggleActionLog()">View Action Log</button>
     </div>
@@ -1899,6 +1921,20 @@
           </div>
         </div>
         <div class="note">Each export produces a standalone JSON file. Year exports include only records for that year plus non-year-specific data; all-years exports include everything.</div>
+      </div>
+    </div>
+    <div class="modal-overlay hidden" id="board-members-modal" role="dialog" aria-modal="true" aria-labelledby="board-members-title">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h4 id="board-members-title">Board Members</h4>
+          <button class="icon-btn" type="button" aria-label="Close" onclick="closeBoardMembersModal()">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <line x1="5" y1="5" x2="19" y2="19"></line>
+              <line x1="19" y1="5" x2="5" y2="19"></line>
+            </svg>
+          </button>
+        </div>
+        <div id="board-members-list" class="text-small"></div>
       </div>
     </div>
   </main>
@@ -1963,10 +1999,14 @@
   let settingsToggle = null;
   let settingsListenersInitialized = false;
   let dataAdminModal = null;
+  let boardMembersModal = null;
   let dataYearSelect = null;
   let dataImportStatus = null;
   let dataImportInput = null;
   let dataModalListenerAttached = false;
+  let boardModalListenerAttached = false;
+  let userSortKey = "name";
+  const userEditStates = {};
   let logoDataUrlCache = null;
 
   let users = [];
@@ -2442,6 +2482,7 @@
     if (!detailTitleEl) detailTitleEl = document.getElementById("detail-title");
     if (!settingsPanel) settingsPanel = document.getElementById("settings-panel");
     if (!settingsToggle) settingsToggle = document.getElementById("settings-toggle");
+    if (!boardMembersModal) boardMembersModal = document.getElementById("board-members-modal");
     if (!settingsListenersInitialized && settingsToggle && settingsPanel) {
       settingsListenersInitialized = true;
       settingsToggle.addEventListener("click", () => {
@@ -2593,6 +2634,12 @@
     appShell.classList.remove("hidden");
     if (userNameEl) userNameEl.textContent = user.name || "Resident";
     if (userLotEl) userLotEl.textContent = user.lot || "—";
+    const profileName = document.getElementById("profile-name");
+    const profileEmail = document.getElementById("profile-email");
+    const profileLot = document.getElementById("profile-lot");
+    if (profileName) profileName.value = user.name || "";
+    if (profileEmail) profileEmail.value = user.email || "";
+    if (profileLot) profileLot.value = user.lot || "—";
     const rolePill = document.getElementById("user-role-pill");
     if (rolePill) {
       rolePill.textContent = (user.role || "").toUpperCase();
@@ -2650,6 +2697,10 @@
     if (!superOnly) {
       closeActionLog();
       closeDataAdminModal();
+    }
+    const profileCard = document.getElementById("profile-card");
+    if (profileCard) {
+      profileCard.style.display = adminVisible ? "none" : "block";
     }
   }
 
@@ -2853,6 +2904,7 @@
 
   function ensureDataAdminRefs() {
     if (!dataAdminModal) dataAdminModal = document.getElementById("data-admin-modal");
+    if (!boardMembersModal) boardMembersModal = document.getElementById("board-members-modal");
     if (!dataYearSelect) dataYearSelect = document.getElementById("data-year-select");
     if (!dataImportStatus) dataImportStatus = document.getElementById("data-import-status");
     if (!dataImportInput) dataImportInput = document.getElementById("data-import-file");
@@ -2860,6 +2912,12 @@
       dataModalListenerAttached = true;
       dataAdminModal.addEventListener("click", event => {
         if (event.target === dataAdminModal) closeDataAdminModal();
+      });
+    }
+    if (boardMembersModal && !boardModalListenerAttached) {
+      boardModalListenerAttached = true;
+      boardMembersModal.addEventListener("click", event => {
+        if (event.target === boardMembersModal) closeBoardMembersModal();
       });
     }
   }
@@ -2912,6 +2970,23 @@
   function closeDataAdminModal() {
     ensureDataAdminRefs();
     if (dataAdminModal) dataAdminModal.classList.add("hidden");
+  }
+
+  function openBoardMembersModal() {
+    const user = getFullCurrentUser();
+    if (!isBoardOrAdmin(user)) {
+      alert("Only board or super admin can view board members.");
+      return;
+    }
+    ensureDataAdminRefs();
+    renderBoardMembers();
+    if (boardMembersModal) boardMembersModal.classList.remove("hidden");
+    if (settingsPanel) settingsPanel.classList.add("hidden");
+  }
+
+  function closeBoardMembersModal() {
+    ensureDataAdminRefs();
+    if (boardMembersModal) boardMembersModal.classList.add("hidden");
   }
 
   function resetDataImport() {
@@ -6770,42 +6845,115 @@
       html += "</table>";
       pendingDiv.innerHTML = html;
     }
-    if (users.length === 0) {
+    const approvedUsers = users.filter(u => u.approved || u.role === "superadmin");
+    const sortSelect = document.getElementById("users-sort");
+    if (sortSelect) sortSelect.value = userSortKey;
+    approvedUsers.sort((a, b) => {
+      if (userSortKey === "lot") {
+        const lotA = parseInt(a.lot, 10);
+        const lotB = parseInt(b.lot, 10);
+        const valA = Number.isFinite(lotA) ? lotA : Number.MAX_SAFE_INTEGER;
+        const valB = Number.isFinite(lotB) ? lotB : Number.MAX_SAFE_INTEGER;
+        return valA - valB;
+      }
+      if (userSortKey === "role") {
+        return (a.role || "").localeCompare((b.role || ""), undefined, { sensitivity: "base" });
+      }
+      return (a.name || "").localeCompare((b.name || ""), undefined, { sensitivity: "base" });
+    });
+    if (approvedUsers.length === 0) {
       allDiv.textContent = "No users.";
       return;
     }
-    let htmlAll = "<table><tr><th>Name</th><th>Email</th><th>Lot</th><th>Role</th><th>Status</th><th>Set Role</th><th>Actions</th></tr>";
-    users.forEach(u => {
+    let htmlAll = "<table><tr><th>Name</th><th>Email</th><th>Lot</th><th>Role</th><th>Status</th><th>Board Role</th><th>Set Role</th><th>Actions</th></tr>";
+    approvedUsers.forEach(u => {
       htmlAll += "<tr>";
-      htmlAll += "<td>" + u.name + "</td>";
-      htmlAll += "<td>" + u.email + "</td>";
+      const isEditing = !!userEditStates[u.id];
+      htmlAll += "<td>";
+      htmlAll += "<input type='text' id='user-name-" + u.id + "' value='" + escapeAttr(u.name || "") + "' ";
+      htmlAll += (isEditing ? "" : "disabled ") + "class='text-small' style='width:160px;'>";
+      htmlAll += "</td>";
+      htmlAll += "<td>";
+      htmlAll += "<input type='text' id='user-email-" + u.id + "' value='" + escapeAttr(u.email || "") + "' ";
+      htmlAll += (isEditing ? "" : "disabled ") + "class='text-small' style='width:200px;'>";
+      htmlAll += "</td>";
       htmlAll += "<td>" + (u.lot || "") + "</td>";
-    htmlAll += "<td>" + u.role + "</td>";
-    htmlAll += "<td>" + (u.approved ? "Approved" : "Pending") + "</td>";
-    htmlAll += "<td>";
-    if (isSuper && u.role !== "superadmin") {
-      htmlAll += "<button class='small' onclick=\"setUserRole('" + u.id + "','resident')\">Resident</button> ";
-      htmlAll += "<button class='small' onclick=\"setUserRole('" + u.id + "','board')\">Board</button>";
-    }
+      htmlAll += "<td>" + u.role + "</td>";
+      htmlAll += "<td>" + (u.approved ? "Approved" : "Pending") + "</td>";
+      htmlAll += "<td>";
+      if (u.role === "board") {
+        const value = escapeAttr(u.boardRole || "");
+        const label = escapeAttr(u.name || u.email || "Board member");
+        htmlAll += "<input class='small' style='width:140px;' type='text' placeholder='e.g., Treasurer' value='" + value + "' ";
+        htmlAll += (isEditing ? "" : "disabled ");
+        htmlAll += "onchange=\"updateBoardRole('" + u.id + "', this.value)\" aria-label='Board role for " + label + "'>";
+      } else {
+        htmlAll += "—";
+      }
+      htmlAll += "</td>";
+      htmlAll += "<td>";
+      if (isSuper && u.role !== "superadmin") {
+        htmlAll += "<button class='small' onclick=\"setUserRole('" + u.id + "','resident')\">Resident</button> ";
+        htmlAll += "<button class='small' onclick=\"setUserRole('" + u.id + "','board')\">Board</button>";
+      }
     htmlAll += "</td>";
     htmlAll += "<td>";
-    if (isSuper && u.role !== "superadmin") {
-      htmlAll += "<button class='small' onclick=\"resetUserPassword('" + u.id + "')\">Reset Password</button> ";
-      htmlAll += "<button class='icon-btn' type='button' onclick=\"deleteUser('" + u.id + "')\" aria-label='Delete user'>";
-      htmlAll += "<svg viewBox='0 0 24 24' aria-hidden='true'>";
-      htmlAll += "<path d='M3 6h18'></path>";
-      htmlAll += "<path d='M8 6V4h8v2'></path>";
-      htmlAll += "<path d='M6 6l1 14h10l1-14'></path>";
-      htmlAll += "<path d='M10 11v6'></path>";
-      htmlAll += "<path d='M14 11v6'></path>";
-      htmlAll += "</svg>";
-      htmlAll += "</button>";
-    }
+      if (isSuper && u.role !== "superadmin") {
+        htmlAll += "<span style='display:inline-flex; gap:6px; align-items:center;'>";
+        htmlAll += "<button class='icon-btn' type='button' onclick=\"toggleUserEdit('" + u.id + "')\" aria-label='Edit user'>";
+        if (isEditing) {
+          htmlAll += "<svg viewBox='0 0 24 24' aria-hidden='true'>";
+          htmlAll += "<rect x='4' y='10' width='16' height='10' rx='2'></rect>";
+          htmlAll += "<path d='M8 10V7a4 4 0 0 1 8 0v3'></path>";
+          htmlAll += "</svg>";
+        } else {
+          htmlAll += "<svg viewBox='0 0 24 24' aria-hidden='true'>";
+          htmlAll += "<path d='M12 20h9'></path>";
+          htmlAll += "<path d='M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'></path>";
+          htmlAll += "</svg>";
+        }
+        htmlAll += "</button>";
+        htmlAll += "<button class='icon-btn' type='button' onclick=\"deleteUser('" + u.id + "')\" aria-label='Delete user'>";
+        htmlAll += "<svg viewBox='0 0 24 24' aria-hidden='true'>";
+        htmlAll += "<path d='M3 6h18'></path>";
+        htmlAll += "<path d='M8 6V4h8v2'></path>";
+        htmlAll += "<path d='M6 6l1 14h10l1-14'></path>";
+        htmlAll += "<path d='M10 11v6'></path>";
+        htmlAll += "<path d='M14 11v6'></path>";
+        htmlAll += "</svg>";
+        htmlAll += "</button>";
+        htmlAll += "</span> ";
+        htmlAll += "<button class='small' onclick=\"resetUserPassword('" + u.id + "')\">Reset Password</button>";
+      }
       htmlAll += "</td>";
       htmlAll += "</tr>";
     });
     htmlAll += "</table>";
     allDiv.innerHTML = htmlAll;
+  }
+
+  function renderBoardMembers() {
+    const list = document.getElementById("board-members-list");
+    if (!list) return;
+    const users = loadLocalData(STORAGE_KEYS.users);
+    const boardMembers = users.filter(u => {
+      const role = (u.role || "").toLowerCase();
+      return role.includes("board");
+    });
+    if (boardMembers.length === 0) {
+      list.textContent = "No board members listed.";
+      return;
+    }
+    let html = "<table><tr><th>Name</th><th>Position</th></tr>";
+    boardMembers.forEach(member => {
+      const position = member.boardRole ? escapeHtml(member.boardRole) : "Unassigned";
+      html += "<tr>";
+      html += "<td>" + escapeHtml(member.name || "Board Member") + "</td>";
+      html += "<td>" + position + "</td>";
+      html += "</tr>";
+    });
+    html += "</table>";
+    list.innerHTML = html;
   }
 
   function approveUser(id) {
@@ -6814,6 +6962,11 @@
     if (!u) return;
     u.approved = true;
     saveLocalData(STORAGE_KEYS.users, users);
+    renderUsers();
+  }
+
+  function setUsersSort(key) {
+    userSortKey = key || "name";
     renderUsers();
   }
 
@@ -6837,8 +6990,25 @@
     const u = users.find(x => x.id === id);
     if (!u) return;
     u.role = role;
+    if (role !== "board") {
+      u.boardRole = "";
+    }
     saveLocalData(STORAGE_KEYS.users, users);
     renderUsers();
+  }
+
+  function updateBoardRole(id, value) {
+    const current = getFullCurrentUser();
+    if (!isBoardOrAdmin(current)) {
+      alert("Only board or super admin can update board roles.");
+      return;
+    }
+    let users = loadLocalData(STORAGE_KEYS.users);
+    const u = users.find(x => x.id === id);
+    if (!u) return;
+    if (u.role !== "board") return;
+    u.boardRole = (value || "").trim();
+    saveLocalData(STORAGE_KEYS.users, users);
   }
 
   function resetUserPassword(id) {
@@ -6889,12 +7059,53 @@
     renderUsers();
   }
 
+  function toggleUserEdit(id) {
+    const current = getFullCurrentUser();
+    if (!isSuperAdmin(current)) {
+      alert("Only the super admin can edit users.");
+      return;
+    }
+    const isEditing = !!userEditStates[id];
+    if (!isEditing) {
+      userEditStates[id] = true;
+      renderUsers();
+      return;
+    }
+    const nameInput = document.getElementById("user-name-" + id);
+    const emailInput = document.getElementById("user-email-" + id);
+    if (!nameInput || !emailInput) return;
+    const nextName = (nameInput.value || "").trim();
+    const nextEmail = (emailInput.value || "").trim().toLowerCase();
+    if (!nextName || !nextEmail) {
+      alert("Name and email are required.");
+      return;
+    }
+    let users = loadLocalData(STORAGE_KEYS.users);
+    const target = users.find(u => u.id === id);
+    if (!target) return;
+    const duplicate = users.find(u => u.id !== id && (u.email || "").toLowerCase() === nextEmail);
+    if (duplicate) {
+      alert("Another user already has that email.");
+      return;
+    }
+    target.name = nextName;
+    target.email = nextEmail;
+    saveLocalData(STORAGE_KEYS.users, users);
+    userEditStates[id] = false;
+    renderUsers();
+  }
+
   function changePassword() {
     const user = getFullCurrentUser();
     if (!user) return;
     const newPass = document.getElementById("profile-new-password").value;
-    if (!newPass) {
-      alert("Enter a new password.");
+    const confirmPass = document.getElementById("profile-confirm-password").value;
+    if (!newPass || !confirmPass) {
+      alert("Enter and confirm your new password.");
+      return;
+    }
+    if (newPass !== confirmPass) {
+      alert("Passwords do not match.");
       return;
     }
     let users = loadLocalData(STORAGE_KEYS.users);
@@ -6903,7 +7114,35 @@
     u.password = newPass;
     saveLocalData(STORAGE_KEYS.users, users);
     document.getElementById("profile-new-password").value = "";
-    alert("Password changed. An email notification would be sent in the live system.");
+    document.getElementById("profile-confirm-password").value = "";
+    alert("Password updated.");
+  }
+
+  function saveProfileDetails() {
+    const user = getFullCurrentUser();
+    if (!user) return;
+    const nameInput = document.getElementById("profile-name");
+    const emailInput = document.getElementById("profile-email");
+    if (!nameInput || !emailInput) return;
+    const nextName = (nameInput.value || "").trim();
+    const nextEmail = (emailInput.value || "").trim().toLowerCase();
+    if (!nextName || !nextEmail) {
+      alert("Name and email are required.");
+      return;
+    }
+    let users = loadLocalData(STORAGE_KEYS.users);
+    const u = users.find(x => x.id === user.id);
+    if (!u) return;
+    const duplicate = users.find(x => x.id !== u.id && (x.email || "").toLowerCase() === nextEmail);
+    if (duplicate) {
+      alert("Another user already has that email.");
+      return;
+    }
+    u.name = nextName;
+    u.email = nextEmail;
+    saveLocalData(STORAGE_KEYS.users, users);
+    if (userNameEl) userNameEl.textContent = u.name || "Resident";
+    alert("Profile updated.");
   }
 
   function renderDashboard() {
