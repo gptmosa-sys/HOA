@@ -2735,8 +2735,13 @@
   function getFullCurrentUser() {
     const current = getCurrentUser();
     if (!current) return null;
-    const users = loadLocalData(STORAGE_KEYS.users);
-    return users.find(u => u.id === current.id) || null;
+    let users = loadLocalData(STORAGE_KEYS.users);
+    let user = users.find(u => u.id === current.id) || null;
+    if (user && (!user.permissions || typeof user.permissions !== "object")) {
+      users = normalizeUsersData();
+      user = users.find(u => u.id === current.id) || null;
+    }
+    return user;
   }
 
   function normalizeUsersData() {
