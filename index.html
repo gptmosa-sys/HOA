@@ -3226,7 +3226,7 @@
   function logAction(description, actor) {
     if (!description) return;
     const user = actor || getFullCurrentUser();
-    if (!user || isSuperAdmin(user)) return;
+    if (!user) return;
     const logs = getActionLogEntries();
     const lotNumber = parseInt(user.lot, 10);
     const entry = {
@@ -3246,6 +3246,12 @@
     if (panel && !panel.classList.contains("hidden")) {
       renderActionLog();
     }
+  }
+
+  function logTileAction(tile, description, actor) {
+    if (!description) return;
+    const prefix = tile ? "[" + tile + "] " : "";
+    logAction(prefix + description, actor);
   }
 
   function formatActionTimestamp(iso) {
@@ -3721,6 +3727,7 @@
       return;
     }
     let meetings = loadLocalData(STORAGE_KEYS.meetings);
+    const actionLabel = meetingEditId ? "Updated" : "Created";
     if (meetingEditId) {
       const existing = meetings.find(m => m.id === meetingEditId);
       if (existing) {
@@ -3749,6 +3756,7 @@
     renderMeetings();
     renderDashboard();
     renderMinutes();
+    logTileAction("Meetings", `${actionLabel} meeting "${title}"`);
   }
 
   function startMeetingEdit(id) {
@@ -3810,6 +3818,7 @@
     }
     if (!confirm("Delete this meeting?")) return;
     let meetings = loadLocalData(STORAGE_KEYS.meetings);
+    const target = meetings.find(m => m.id === id);
     const nextMeetings = meetings.filter(m => m.id !== id);
     if (nextMeetings.length === meetings.length) return;
     saveLocalData(STORAGE_KEYS.meetings, nextMeetings);
@@ -3820,6 +3829,7 @@
     renderMeetings();
     renderDashboard();
     renderMinutes();
+    logTileAction("Meetings", `Deleted meeting "${(target && target.title) || "Meeting"}"`);
   }
 
   function normalizeMeetingLink(link) {
@@ -3921,8 +3931,10 @@
       };
       dues.push(record);
     }
+    let actionLabel = "";
     if (rawValue === "" || rawValue === null) {
       delete record.amountPaid;
+      actionLabel = `Cleared custom dues for Lot ${lot} (${year})`;
     } else {
       let amount = parseFloat(rawValue);
       if (Number.isNaN(amount) || amount < 0) {
@@ -3932,10 +3944,14 @@
       }
       amount = Math.round(amount * 100) / 100;
       record.amountPaid = amount;
+      actionLabel = `Set custom dues for Lot ${lot} (${year}) to $${amount.toFixed(2)}`;
     }
     record.updatedAt = new Date().toISOString();
     record.updatedBy = user ? user.id : null;
     saveLocalData(STORAGE_KEYS.dues, dues);
+    if (actionLabel) {
+      logTileAction("Dues", actionLabel);
+    }
     renderDues();
     renderDashboard();
     renderFinancials();
@@ -3972,6 +3988,11 @@
       dues.push(record);
     }
     saveLocalData(STORAGE_KEYS.dues, dues);
+    const statusLabel = paid ? "paid" : "unpaid";
+    const amountLabel = paid && normalizedAmount !== null
+      ? " ($" + normalizedAmount.toFixed(2) + ")"
+      : "";
+    logTileAction("Dues", `Marked Lot ${lot} ${statusLabel} for ${year}${amountLabel}`);
   }
 
   function confirmDuesStatusChange(year, lot, newPaid) {
@@ -4177,7 +4198,7 @@
     }
     const normalized = Math.round(parsed * 100) / 100;
     saveBalanceForwardOverride(year, normalized, noteValue);
-    logAction("Adjusted balance forward for " + year + " to $" + normalized.toFixed(2) + " · Note: " + noteValue);
+    logTileAction("Dues", "Adjusted balance forward for " + year + " to $" + normalized.toFixed(2) + " · Note: " + noteValue);
     renderFinancials();
     renderDues();
   }
@@ -4278,6 +4299,7 @@
     const amount = Math.round(amountRaw * 100) / 100;
     let amounts = loadLocalData(STORAGE_KEYS.duesAmounts);
     const existing = amounts.find(a => a.year === targetYear);
+    const actionLabel = existing ? "Updated" : "Set";
     if (existing) {
       existing.amount = amount;
       existing.note = note;
@@ -4299,6 +4321,7 @@
     updateDuesAmountUI(targetYear, amount, note);
     renderDues();
     renderFinancials();
+    logTileAction("Dues", `${actionLabel} yearly dues for ${targetYear} to $${amount.toFixed(2)}`);
   }
 
   function readFileAsDataUrl(file) {
@@ -4594,7 +4617,7 @@
       }
       saveLocalData(STORAGE_KEYS.documents, documents);
       const actionLabel = isUpdating ? "Updated" : "Uploaded";
-      logAction(`${actionLabel} Kingston document "${title}"`);
+      logTileAction("Documents", `${actionLabel} Kingston document "${title}"`);
       resetDocumentFormFields();
       exitDocumentEditMode();
       renderDocuments();
@@ -4664,7 +4687,7 @@
       resetDocumentFormFields();
       exitDocumentEditMode();
     }
-    logAction(`Deleted Kingston document "${targetDoc.title || "Document"}"`);
+    logTileAction("Documents", `Deleted Kingston document "${targetDoc.title || "Document"}"`);
     renderDocuments();
   }
 
@@ -5206,7 +5229,7 @@
       saveLocalData(STORAGE_KEYS.residentDocuments, docs);
       const lotLabel = Number.isFinite(targetLot) ? "Lot " + targetLot : "Lot —";
       const actionLabel = isEditing ? "Updated" : "Uploaded";
-      logAction(`${actionLabel} resident document "${title}" (${lotLabel})`);
+      logTileAction("Documents", `${actionLabel} resident document "${title}" (${lotLabel})`);
       resetResidentDocForm();
       if (note) {
         note.textContent = (isEditing ? "Updated " : "Uploaded ") + new Date().toLocaleString();
@@ -5248,7 +5271,7 @@
     if (residentDocEditId === id) {
       resetResidentDocForm();
     }
-    logAction(`Deleted resident document "${title}" (${lotLabel})`);
+    logTileAction("Documents", `Deleted resident document "${title}" (${lotLabel})`);
     renderResidentDocuments();
   }
 
@@ -5465,7 +5488,7 @@
       }
       saveLocalData(STORAGE_KEYS.minutes, minutes);
       const actionLabel = isEditing ? "Updated" : "Uploaded";
-      logAction(`${actionLabel} minutes "${title}"`);
+      logTileAction("Minutes", `${actionLabel} minutes "${title}"`);
       resetMinutesFormFields();
       exitMinutesEditMode();
       renderMinutes();
@@ -5582,7 +5605,7 @@
       resetMinutesFormFields();
       exitMinutesEditMode();
     }
-    logAction(`Deleted minutes "${target.title || "Minutes"}"`);
+    logTileAction("Minutes", `Deleted minutes "${target.title || "Minutes"}"`);
     renderMinutes();
   }
 
@@ -5717,7 +5740,7 @@
         target.costEstimate = costValue || "N/A";
         target.anonymous = anonymous;
         target.updatedAt = timestamp;
-        logAction(`Updated idea "${title}"`);
+        logTileAction("Ideas", `Updated idea "${title}"`);
       } else {
         const attachments = newFiles.slice();
         const id = "idea_" + Date.now();
@@ -5733,7 +5756,7 @@
           createdAt: timestamp,
           updatedAt: timestamp
         });
-        logAction(`Submitted idea "${title}"`);
+        logTileAction("Ideas", `Submitted idea "${title}"`);
       }
       saveLocalData(STORAGE_KEYS.ideas, ideas);
       resetIdeaForm();
@@ -5879,7 +5902,7 @@
     if (ideaEditId === id) {
       resetIdeaForm();
     }
-    logAction(`Deleted idea "${idea.title || "Idea"}"`);
+    logTileAction("Ideas", `Deleted idea "${idea.title || "Idea"}"`);
     renderIdeas();
   }
 
@@ -5905,7 +5928,7 @@
     idea.votes[lotKey] = value;
     idea.updatedAt = new Date().toISOString();
     saveLocalData(STORAGE_KEYS.ideas, ideas);
-    logAction(`Voted ${value === 1 ? "up" : "down"} on idea "${idea.title || "Idea"}"`);
+    logTileAction("Ideas", `Voted ${value === 1 ? "up" : "down"} on idea "${idea.title || "Idea"}"`);
     renderIdeas();
   }
 
@@ -5932,6 +5955,7 @@
       return;
     }
     let votes = loadLocalData(STORAGE_KEYS.votes);
+    const actionLabel = voteEditId ? "Updated" : "Created";
     if (voteEditId) {
       const existing = votes.find(v => v.id === voteEditId);
       if (!existing) {
@@ -5966,6 +5990,7 @@
     exitVoteEditMode();
     renderVotes();
     renderDashboard();
+    logTileAction("Voting", `${actionLabel} vote "${topic}"`);
   }
 
   function startVoteEdit(id) {
@@ -6031,6 +6056,7 @@
     }
     if (!confirm("Delete this vote? This cannot be undone.")) return;
     let votes = loadLocalData(STORAGE_KEYS.votes);
+    const target = votes.find(v => v.id === id);
     const nextVotes = votes.filter(v => v.id !== id);
     if (nextVotes.length === votes.length) return;
     saveLocalData(STORAGE_KEYS.votes, nextVotes);
@@ -6040,6 +6066,7 @@
     }
     renderVotes();
     renderDashboard();
+    logTileAction("Voting", `Deleted vote "${(target && target.topic) || "Vote"}"`);
   }
 
   function castVote(voteId, value) {
@@ -6169,6 +6196,8 @@
     document.getElementById("fin-date").value = "";
     document.getElementById("fin-description").value = "";
     renderFinancials();
+    const amountLabel = Number.isFinite(amount) ? "$" + amount.toFixed(2) : "amount";
+    logTileAction("Financials", `Added ${type} entry · ${category} · ${amountLabel} · ${year}`);
   }
 
   function getManualFinancialEntries() {
@@ -7013,6 +7042,7 @@
     }
     const normalizedPlannedCost = Number.isFinite(plannedCost) ? plannedCost : null;
     let projects = loadLocalData(STORAGE_KEYS.projects);
+    const actionLabel = projectEditId ? "Updated" : "Created";
     if (projectEditId) {
       const project = projects.find(p => p.id === projectEditId);
       if (!project) {
@@ -7034,6 +7064,7 @@
       resetProjectForm();
       renderProjects();
       renderFinancials();
+      logTileAction("Projects", `${actionLabel} project "${name}"`);
       return;
     } else {
       const project = {
@@ -7055,6 +7086,7 @@
       resetProjectForm();
       renderProjects();
       renderFinancials();
+      logTileAction("Projects", `${actionLabel} project "${name}"`);
       return;
     }
   }
@@ -7261,6 +7293,11 @@
     saveLocalData(STORAGE_KEYS.projects, projects);
     renderProjects();
     renderFinancials();
+    const statusLabel = project.paid ? "paid" : "unpaid";
+    const costLabel = project.paid && Number.isFinite(project.actualCost)
+      ? " ($" + Number(project.actualCost).toFixed(2) + ")"
+      : "";
+    logTileAction("Projects", `Marked project "${project.name || "Project"}" ${statusLabel}${costLabel}`);
   }
 
   function downloadProjectAttachment(projectId, kind, index = null) {
@@ -7614,9 +7651,9 @@
       if (isSuperAdmin(u)) {
         html += "Super Admin";
       } else if (hasAdminPermission(u)) {
-        html += "Admin";
+        html += "<button class='small ghost-btn' onclick=\"toggleAdminPermission('" + u.id + "', false)\">Remove Admin</button>";
       } else {
-        html += "<button class='small primary' onclick=\"promoteToAdmin('" + u.id + "')\">Select Admin</button>";
+        html += "<button class='small primary' onclick=\"toggleAdminPermission('" + u.id + "', true)\">Make Admin</button>";
       }
       html += "</td>";
       html += "</tr>";
@@ -7625,7 +7662,7 @@
     list.innerHTML = html;
   }
 
-  function promoteToAdmin(id) {
+  function toggleAdminPermission(id, enabled) {
     const current = getFullCurrentUser();
     if (!isSuperAdmin(current)) {
       alert("Only the super admin can assign admins.");
@@ -7639,11 +7676,13 @@
       return;
     }
     if (!u.permissions || typeof u.permissions !== "object") {
-      u.permissions = { admin: true, superadmin: false };
+      u.permissions = { admin: !!enabled, superadmin: false };
     } else {
-      u.permissions.admin = true;
+      u.permissions.admin = !!enabled;
     }
     saveLocalData(STORAGE_KEYS.users, users);
+    const nameLabel = u.name || u.email || "User";
+    logTileAction("Users", `${enabled ? "Granted" : "Removed"} admin access for "${nameLabel}"`);
     renderAdministrationList();
     renderUsers();
   }
@@ -7706,11 +7745,16 @@
     const u = users.find(x => x.id === id);
     if (!u) return;
     const normalized = role === "board" ? "board" : "resident";
+    const prevRole = u.role || "resident";
     u.role = normalized;
     if (normalized !== "board") {
       u.boardRole = "";
     }
     saveLocalData(STORAGE_KEYS.users, users);
+    if (prevRole !== normalized) {
+      const nameLabel = u.name || u.email || "User";
+      logTileAction("Users", `Set role for "${nameLabel}" to ${normalized}`);
+    }
     renderUsers();
   }
 
