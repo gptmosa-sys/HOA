@@ -2179,6 +2179,7 @@
       <button class="primary small" type="button" onclick="openBoardMembersModal()">Board Members</button>
       <button class="primary small hidden" type="button" id="data-admin-btn" onclick="openDataAdminModal()">Export / Import Data</button>
       <button class="ghost-btn small hidden" type="button" id="view-action-log-btn" onclick="toggleActionLog()">View Action Log</button>
+      <button class="ghost-btn small hidden" type="button" id="administration-btn" onclick="openAdministrationModal()">Administration</button>
     </div>
     <div class="action-log-panel hidden" id="action-log-panel">
       <div class="action-log-header">
@@ -2226,6 +2227,21 @@
           </div>
         </div>
         <div class="note">Each export produces a standalone JSON file. Year exports include only records for that year plus non-year-specific data; all-years exports include everything.</div>
+      </div>
+    </div>
+    <div class="modal-overlay hidden" id="administration-modal" role="dialog" aria-modal="true" aria-labelledby="administration-title">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h4 id="administration-title">Administration</h4>
+          <button class="icon-btn" type="button" aria-label="Close" onclick="closeAdministrationModal()">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <line x1="5" y1="5" x2="19" y2="19"></line>
+              <line x1="19" y1="5" x2="5" y2="19"></line>
+            </svg>
+          </button>
+        </div>
+        <div class="note">Select a user to grant admin access.</div>
+        <div id="administration-list" class="text-small"></div>
       </div>
     </div>
     <div class="modal-overlay hidden" id="board-members-modal" role="dialog" aria-modal="true" aria-labelledby="board-members-title">
@@ -2327,12 +2343,14 @@
   let settingsListenersInitialized = false;
   let dataAdminModal = null;
   let boardMembersModal = null;
+  let administrationModal = null;
   let lotMapModal = null;
   let dataYearSelect = null;
   let dataImportStatus = null;
   let dataImportInput = null;
   let dataModalListenerAttached = false;
   let boardModalListenerAttached = false;
+  let administrationModalListenerAttached = false;
   let lotMapListenerAttached = false;
   let userSortKey = "name";
   const userEditStates = {};
@@ -2721,6 +2739,55 @@
     return users.find(u => u.id === current.id) || null;
   }
 
+  function normalizeUsersData() {
+    let users = loadLocalData(STORAGE_KEYS.users);
+    let changed = false;
+    users = users.map(user => {
+      const next = { ...user };
+      const roleRaw = String(next.role || "resident").toLowerCase();
+      if (roleRaw !== "resident" && roleRaw !== "board") {
+        next.role = "resident";
+        changed = true;
+      } else {
+        next.role = roleRaw;
+      }
+      const permissions = next.permissions && typeof next.permissions === "object"
+        ? { ...next.permissions }
+        : { admin: false, superadmin: false };
+      if (!next.permissions || typeof next.permissions !== "object") {
+        changed = true;
+      }
+      const legacyRole = String(user.role || "").toLowerCase();
+      if (legacyRole === "admin") {
+        permissions.admin = true;
+        changed = true;
+      }
+      if (legacyRole === "superadmin") {
+        permissions.superadmin = true;
+        permissions.admin = true;
+        changed = true;
+      }
+      const normalizedAdmin = !!permissions.admin;
+      const normalizedSuper = !!permissions.superadmin;
+      if (permissions.admin !== normalizedAdmin || permissions.superadmin !== normalizedSuper) {
+        changed = true;
+      }
+      next.permissions = { admin: normalizedAdmin, superadmin: normalizedSuper };
+      return next;
+    });
+    if (changed) saveLocalData(STORAGE_KEYS.users, users);
+    return users;
+  }
+
+  function isBoard(user) {
+    if (!user || !user.role) return false;
+    return String(user.role).toLowerCase() === "board";
+  }
+
+  function hasAdminPermission(user) {
+    return !!(user && user.permissions && user.permissions.admin);
+  }
+
   function escapeHtml(str) {
     return (str || "")
       .replace(/&/g, "&amp;")
@@ -2849,14 +2916,15 @@
 
   function initSuperAdmin() {
     let users = loadLocalData(STORAGE_KEYS.users);
-    const hasSuper = users.some(u => u.role === "superadmin");
+    const hasSuper = users.some(u => isSuperAdmin(u));
     if (!hasSuper) {
       users.push({
         id: "user_superadmin_default",
         name: "Super Admin",
         email: "admin@example.com",
         password: "admin123",
-        role: "superadmin",
+        role: "resident",
+        permissions: { admin: true, superadmin: true },
         lot: "",
         approved: true,
         createdAt: new Date().toISOString()
@@ -2906,7 +2974,7 @@
       alert("Invalid email or password.");
       return;
     }
-    if (!user.approved && user.role !== "superadmin") {
+    if (!user.approved && !isSuperAdmin(user)) {
       alert("Your registration is pending approval.");
       return;
     }
@@ -2947,6 +3015,7 @@
       password,
       lot: lot || "",
       role: "resident",
+      permissions: { admin: false, superadmin: false },
       approved: false,
       createdAt: new Date().toISOString()
     });
@@ -2990,30 +3059,34 @@
     if (profileLot) profileLot.value = user.lot || "—";
     const rolePill = document.getElementById("user-role-pill");
     if (rolePill) {
-      rolePill.textContent = (user.role || "").toUpperCase();
       rolePill.className = "pill";
-      if (user.role === "board") rolePill.classList.add("board");
-      if (user.role === "superadmin") rolePill.classList.add("super");
+      if (isSuperAdmin(user)) {
+        rolePill.textContent = "SUPER ADMIN";
+        rolePill.classList.add("super");
+      } else {
+        rolePill.textContent = (user.role || "resident").toUpperCase();
+      }
+      if (isBoard(user)) rolePill.classList.add("board");
     }
     updateRoleVisibility(user);
     refreshAllViews();
     switchSection("meetings");
   }
 
+  function isAdmin(user) {
+    return isSuperAdmin(user) || hasAdminPermission(user);
+  }
+
   function isBoardOrAdmin(user) {
-    if (!user || !user.role) return false;
-    const role = String(user.role).toLowerCase();
-    return role === "board" || role === "admin" || role === "superadmin";
+    return isBoard(user) || isAdmin(user);
   }
 
   function isAdminOrSuper(user) {
-    if (!user || !user.role) return false;
-    const role = String(user.role).toLowerCase();
-    return role === "admin" || role === "superadmin";
+    return isAdmin(user);
   }
 
   function isSuperAdmin(user) {
-    return !!user && user.role === "superadmin";
+    return !!(user && user.permissions && user.permissions.superadmin);
   }
 
   function updateRoleVisibility(user) {
@@ -3052,9 +3125,12 @@
     if (logBtn) logBtn.classList.toggle("hidden", !superOnly);
     const dataBtn = document.getElementById("data-admin-btn");
     if (dataBtn) dataBtn.classList.toggle("hidden", !superOnly);
+    const adminBtn = document.getElementById("administration-btn");
+    if (adminBtn) adminBtn.classList.toggle("hidden", !superOnly);
     if (!superOnly) {
       closeActionLog();
       closeDataAdminModal();
+      closeAdministrationModal();
     }
     const profileCard = document.getElementById("profile-card");
     if (profileCard) {
@@ -3145,7 +3221,7 @@
   function logAction(description, actor) {
     if (!description) return;
     const user = actor || getFullCurrentUser();
-    if (!user || user.role === "superadmin") return;
+    if (!user || isSuperAdmin(user)) return;
     const logs = getActionLogEntries();
     const lotNumber = parseInt(user.lot, 10);
     const entry = {
@@ -3263,6 +3339,7 @@
   function ensureDataAdminRefs() {
     if (!dataAdminModal) dataAdminModal = document.getElementById("data-admin-modal");
     if (!boardMembersModal) boardMembersModal = document.getElementById("board-members-modal");
+    if (!administrationModal) administrationModal = document.getElementById("administration-modal");
     if (!lotMapModal) lotMapModal = document.getElementById("lot-map-modal");
     if (!dataYearSelect) dataYearSelect = document.getElementById("data-year-select");
     if (!dataImportStatus) dataImportStatus = document.getElementById("data-import-status");
@@ -3277,6 +3354,12 @@
       boardModalListenerAttached = true;
       boardMembersModal.addEventListener("click", event => {
         if (event.target === boardMembersModal) closeBoardMembersModal();
+      });
+    }
+    if (administrationModal && !administrationModalListenerAttached) {
+      administrationModalListenerAttached = true;
+      administrationModal.addEventListener("click", event => {
+        if (event.target === administrationModal) closeAdministrationModal();
       });
     }
     if (lotMapModal && !lotMapListenerAttached) {
@@ -3337,10 +3420,27 @@
     if (dataAdminModal) dataAdminModal.classList.add("hidden");
   }
 
+  function openAdministrationModal() {
+    const user = getFullCurrentUser();
+    if (!isSuperAdmin(user)) {
+      alert("Only the super admin can access administration.");
+      return;
+    }
+    ensureDataAdminRefs();
+    renderAdministrationList();
+    if (administrationModal) administrationModal.classList.remove("hidden");
+    if (settingsPanel) settingsPanel.classList.add("hidden");
+  }
+
+  function closeAdministrationModal() {
+    ensureDataAdminRefs();
+    if (administrationModal) administrationModal.classList.add("hidden");
+  }
+
   function openBoardMembersModal() {
     const user = getFullCurrentUser();
     if (!isBoardOrAdmin(user)) {
-      alert("Only board or super admin can view board members.");
+      alert("Only board members or admins can view board members.");
       return;
     }
     ensureDataAdminRefs();
@@ -7372,11 +7472,11 @@
     const canManage = isBoardOrAdmin(current);
     const isSuper = isSuperAdmin(current);
     if (!canManage) {
-      pendingDiv.textContent = "Only board or super admin can manage users.";
+      pendingDiv.textContent = "Only board members or admins can manage users.";
       allDiv.textContent = "";
       return;
     }
-    const pending = users.filter(u => !u.approved && u.role !== "superadmin");
+    const pending = users.filter(u => !u.approved && !isSuperAdmin(u));
     if (pending.length === 0) {
       pendingDiv.textContent = "No pending registrations.";
     } else {
@@ -7395,7 +7495,7 @@
       html += "</table>";
       pendingDiv.innerHTML = html;
     }
-    const approvedUsers = users.filter(u => u.approved || u.role === "superadmin");
+    const approvedUsers = users.filter(u => u.approved || isSuperAdmin(u));
     const sortSelect = document.getElementById("users-sort");
     if (sortSelect) sortSelect.value = userSortKey;
     approvedUsers.sort((a, b) => {
@@ -7428,7 +7528,7 @@
       htmlAll += (isEditing ? "" : "disabled ") + "class='text-small' style='width:200px;'>";
       htmlAll += "</td>";
       htmlAll += "<td class='lot-cell'>" + (u.lot || "") + "</td>";
-      htmlAll += "<td>" + u.role + "</td>";
+      htmlAll += "<td>" + escapeHtml(u.role || "resident") + "</td>";
       htmlAll += "<td>" + (u.approved ? "Approved" : "Pending") + "</td>";
       htmlAll += "<td>";
       if (u.role === "board") {
@@ -7442,7 +7542,7 @@
       }
       htmlAll += "</td>";
       htmlAll += "<td>";
-      if (isSuper && u.role !== "superadmin") {
+      if (isSuper && !isSuperAdmin(u)) {
         htmlAll += "<div class='role-actions'>";
         htmlAll += "<button class='small role-btn role-btn-resident' onclick=\"setUserRole('" + u.id + "','resident')\">Resident</button>";
         htmlAll += "<button class='small role-btn role-btn-board' onclick=\"setUserRole('" + u.id + "','board')\">Board</button>";
@@ -7450,7 +7550,7 @@
       }
       htmlAll += "</td>";
       htmlAll += "<td class='user-actions-cell'>";
-      if (isSuper && u.role !== "superadmin") {
+      if (isSuper && !isSuperAdmin(u)) {
         htmlAll += "<div class='user-actions'>";
         htmlAll += "<div class='user-action-row'>";
         htmlAll += "<button class='icon-btn user-action-icon' type='button' onclick=\"toggleUserEdit('" + u.id + "')\" aria-label='Edit user'>";
@@ -7484,6 +7584,63 @@
     });
     htmlAll += "</table>";
     allDiv.innerHTML = htmlAll;
+  }
+
+  function renderAdministrationList() {
+    const list = document.getElementById("administration-list");
+    if (!list) return;
+    const users = loadLocalData(STORAGE_KEYS.users);
+    if (users.length === 0) {
+      list.textContent = "No users.";
+      return;
+    }
+    let html = "<table><tr><th>Name</th><th>Email</th><th class='center'>Lot</th><th class='center'>Role</th><th class='center'>Actions</th></tr>";
+    users.forEach(u => {
+      const name = escapeHtml(u.name || "—");
+      const email = escapeHtml(u.email || "—");
+      const lot = escapeHtml(u.lot ? String(u.lot) : "—");
+      const role = escapeHtml(u.role || "resident");
+      html += "<tr>";
+      html += "<td>" + name + "</td>";
+      html += "<td>" + email + "</td>";
+      html += "<td class='center'>" + lot + "</td>";
+      html += "<td class='center'>" + role + "</td>";
+      html += "<td class='center'>";
+      if (isSuperAdmin(u)) {
+        html += "Super Admin";
+      } else if (hasAdminPermission(u)) {
+        html += "Admin";
+      } else {
+        html += "<button class='small primary' onclick=\"promoteToAdmin('" + u.id + "')\">Select Admin</button>";
+      }
+      html += "</td>";
+      html += "</tr>";
+    });
+    html += "</table>";
+    list.innerHTML = html;
+  }
+
+  function promoteToAdmin(id) {
+    const current = getFullCurrentUser();
+    if (!isSuperAdmin(current)) {
+      alert("Only the super admin can assign admins.");
+      return;
+    }
+    let users = loadLocalData(STORAGE_KEYS.users);
+    const u = users.find(x => x.id === id);
+    if (!u) return;
+    if (isSuperAdmin(u)) {
+      alert("Super admin permissions cannot be changed.");
+      return;
+    }
+    if (!u.permissions || typeof u.permissions !== "object") {
+      u.permissions = { admin: true, superadmin: false };
+    } else {
+      u.permissions.admin = true;
+    }
+    saveLocalData(STORAGE_KEYS.users, users);
+    renderAdministrationList();
+    renderUsers();
   }
 
   function renderBoardMembers() {
@@ -7527,7 +7684,7 @@
   function denyUser(id) {
     const current = getFullCurrentUser();
     if (!isBoardOrAdmin(current)) {
-      alert("Only board or super admin can deny users.");
+      alert("Only board members or admins can deny users.");
       return;
     }
     let users = loadLocalData(STORAGE_KEYS.users);
@@ -7543,8 +7700,9 @@
     let users = loadLocalData(STORAGE_KEYS.users);
     const u = users.find(x => x.id === id);
     if (!u) return;
-    u.role = role;
-    if (role !== "board") {
+    const normalized = role === "board" ? "board" : "resident";
+    u.role = normalized;
+    if (normalized !== "board") {
       u.boardRole = "";
     }
     saveLocalData(STORAGE_KEYS.users, users);
@@ -7554,7 +7712,7 @@
   function updateBoardRole(id, value) {
     const current = getFullCurrentUser();
     if (!isBoardOrAdmin(current)) {
-      alert("Only board or super admin can update board roles.");
+      alert("Only board members or admins can update board roles.");
       return;
     }
     let users = loadLocalData(STORAGE_KEYS.users);
@@ -7574,7 +7732,7 @@
     let users = loadLocalData(STORAGE_KEYS.users);
     const target = users.find(u => u.id === id);
     if (!target) return;
-    if (target.role === "superadmin") {
+    if (isSuperAdmin(target)) {
       alert("Super admin passwords must be managed directly.");
       return;
     }
@@ -7600,7 +7758,7 @@
     let users = loadLocalData(STORAGE_KEYS.users);
     const target = users.find(u => u.id === id);
     if (!target) return;
-    if (target.role === "superadmin") {
+    if (isSuperAdmin(target)) {
       alert("Super admin accounts cannot be deleted.");
       return;
     }
@@ -7792,6 +7950,7 @@
 
   window.onload = async function() {
     await loadData();
+    normalizeUsersData();
     initSuperAdmin();
     if (getFullCurrentUser()) {
       showApp();
