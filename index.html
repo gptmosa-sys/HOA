@@ -1760,11 +1760,13 @@
       <label>Password</label>
       <input type="password" id="login-password">
       <button class="primary" onclick="handleLogin()">Login</button>
+      <!--
       <div class="note">
         Default super admin:<br>
-        Email: admin@example.com<br>
-        Password: 
+        Email: <br>
+        Password:
       </div>
+      -->
     </div>
     <div id="login-right">
       <h2>Register</h2>
@@ -2371,7 +2373,7 @@
             </svg>
           </button>
         </div>
-        <p class="note">Super admins can export JSON backups by year or all years, and import a backup to restore data.</p>
+        <p class="note">Admins and super admins can export JSON backups by year or all years, and import a backup to restore data.</p>
         <div class="data-grid">
           <div class="data-card">
             <h5>Select Year</h5>
@@ -2512,6 +2514,7 @@
   let settingsPanel = null;
   let settingsToggle = null;
   let settingsListenersInitialized = false;
+  let loginListenersInitialized = false;
   let dataAdminModal = null;
   let boardMembersModal = null;
   let administrationModal = null;
@@ -3109,6 +3112,7 @@
         settingsPanel.classList.add("hidden");
       });
     }
+    initLoginListeners();
     initResidentDocLotSelect();
     resetProjectForm();
     updateIdeasTabs();
@@ -3134,6 +3138,21 @@
       });
       saveLocalData(STORAGE_KEYS.users, users);
     }
+  }
+
+  function initLoginListeners() {
+    if (loginListenersInitialized) return;
+    const loginEmail = document.getElementById("login-email");
+    const loginPassword = document.getElementById("login-password");
+    if (!loginEmail || !loginPassword) return;
+    loginListenersInitialized = true;
+    const handleLoginEnter = event => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      handleLogin();
+    };
+    loginEmail.addEventListener("keydown", handleLoginEnter);
+    loginPassword.addEventListener("keydown", handleLoginEnter);
   }
 
   function initResidentDocLotSelect() {
@@ -3337,7 +3356,7 @@
     const logBtn = document.getElementById("view-action-log-btn");
     if (logBtn) logBtn.classList.toggle("hidden", !superOnly);
     const dataBtn = document.getElementById("data-admin-btn");
-    if (dataBtn) dataBtn.classList.toggle("hidden", !superOnly);
+    if (dataBtn) dataBtn.classList.toggle("hidden", !isAdmin(user));
     const adminBtn = document.getElementById("administration-btn");
     if (adminBtn) adminBtn.classList.toggle("hidden", !superOnly);
     if (!superOnly) {
@@ -3710,8 +3729,8 @@
 
   function openDataAdminModal() {
     const user = getFullCurrentUser();
-    if (!isSuperAdmin(user)) {
-      alert("Only the super admin can export or import data.");
+    if (!isAdmin(user)) {
+      alert("Only admins and super admins can export or import data.");
       return;
     }
     ensureDataAdminRefs();
@@ -3863,8 +3882,8 @@
 
   function exportSelectedYearData() {
     const user = getFullCurrentUser();
-    if (!isSuperAdmin(user)) {
-      alert("Only the super admin can export data.");
+    if (!isAdmin(user)) {
+      alert("Only admins and super admins can export data.");
       return;
     }
     ensureDataAdminRefs();
@@ -3880,8 +3899,8 @@
 
   function exportAllData() {
     const user = getFullCurrentUser();
-    if (!isSuperAdmin(user)) {
-      alert("Only the super admin can export data.");
+    if (!isAdmin(user)) {
+      alert("Only admins and super admins can export data.");
       return;
     }
     const snapshot = buildDataSnapshot(null);
@@ -3921,8 +3940,8 @@
 
   function importDataFromFile() {
     const user = getFullCurrentUser();
-    if (!isSuperAdmin(user)) {
-      alert("Only the super admin can import data.");
+    if (!isAdmin(user)) {
+      alert("Only admins and super admins can import data.");
       return;
     }
     ensureDataAdminRefs();
@@ -8306,6 +8325,7 @@
     await loadData();
     normalizeUsersData();
     initSuperAdmin();
+    initLoginListeners();
     if (getFullCurrentUser()) {
       showApp();
     } else {
