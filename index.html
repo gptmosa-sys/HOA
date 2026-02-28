@@ -259,6 +259,12 @@
       padding: 18px 32px;
     }
 
+    .banner-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
     .banner-copy {
       color: rgba(255, 255, 255, 0.85);
     }
@@ -846,6 +852,150 @@
       display: block;
     }
 
+    .ideas-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid rgba(31, 49, 65, 0.15);
+      padding-bottom: 6px;
+    }
+
+    .ideas-tab-btn {
+      border: none;
+      background: transparent;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      color: var(--ink-muted);
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .ideas-tab-btn.active {
+      background: var(--navy);
+      color: #fff;
+    }
+
+    .ideas-tab-panel {
+      display: none;
+    }
+
+    .ideas-tab-panel.active {
+      display: block;
+    }
+
+    .votes-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid rgba(31, 49, 65, 0.15);
+      padding-bottom: 6px;
+    }
+
+    .votes-tab-btn {
+      border: none;
+      background: transparent;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      color: var(--ink-muted);
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .votes-tab-btn.active {
+      background: var(--navy);
+      color: #fff;
+    }
+
+    .votes-tab-panel {
+      display: none;
+    }
+
+    .votes-tab-panel.active {
+      display: block;
+    }
+
+    .meetings-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid rgba(31, 49, 65, 0.15);
+      padding-bottom: 6px;
+    }
+
+    .meetings-tab-btn {
+      border: none;
+      background: transparent;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      color: var(--ink-muted);
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .meetings-tab-btn.active {
+      background: var(--navy);
+      color: #fff;
+    }
+
+    .meetings-tab-panel {
+      display: none;
+    }
+
+    .meetings-tab-panel.active {
+      display: block;
+    }
+
+    .projects-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid rgba(31, 49, 65, 0.15);
+      padding-bottom: 6px;
+    }
+
+    .projects-tab-btn {
+      border: none;
+      background: transparent;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      color: var(--ink-muted);
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .projects-tab-btn.active {
+      background: var(--navy);
+      color: #fff;
+    }
+
+    .projects-tab-panel {
+      display: none;
+    }
+
+    .projects-tab-panel.active {
+      display: block;
+    }
+
     .detail-header {
       display: flex;
       justify-content: space-between;
@@ -1355,9 +1505,7 @@
     }
 
     .settings-btn {
-      position: fixed;
-      left: 32px;
-      top: 32px;
+      position: relative;
       width: 44px;
       height: 44px;
       border-radius: 50%;
@@ -1369,6 +1517,7 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
+      flex-shrink: 0;
     }
 
     .settings-btn svg {
@@ -1379,7 +1528,7 @@
 
     .settings-flyout {
       position: fixed;
-      left: 24px;
+      left: max(24px, calc(50% - 600px + 32px));
       top: 110px;
       width: 240px;
       background: #fffdf6;
@@ -1614,7 +1763,7 @@
       <div class="note">
         Default super admin:<br>
         Email: admin@example.com<br>
-        Password: admin1234
+        Password: 
       </div>
     </div>
     <div id="login-right">
@@ -1639,12 +1788,20 @@
 </div>
 
 
-<div id="app" class="hidden">
+  <div id="app" class="hidden">
   <div class="app-banner">
     <div class="banner-inner">
-      <div class="banner-copy">
-        <p class="banner-title">Kingston HOA Portal</p>
-        <p class="banner-subtitle">kingston.community.hoa@gmail.com</p>
+      <div class="banner-left">
+        <button class="settings-btn" id="settings-toggle" aria-label="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a6.94 6.94 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 14.9 2h-3.8a.5.5 0 0 0-.49.41l-.36 2.54c-.6.24-1.14.56-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L3.7 8.47a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L3.82 15.15a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.39.32.61.22l2.39-.96c.49.38 1.03.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.41h3.8a.5.5 0 0 0 .49-.41l.36-2.54c.6-.24 1.14-.56 1.63-.94l2.39.96c.23.09.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" fill="currentColor"></path>
+          </svg>
+          <span class="notification-dot hidden" id="settings-alert-dot" aria-hidden="true"></span>
+        </button>
+        <div class="banner-copy">
+          <p class="banner-title">Kingston HOA Portal</p>
+          <p class="banner-subtitle">kingston.community.hoa@gmail.com</p>
+        </div>
       </div>
       <div id="user-info">
         <span>User: <strong id="user-name"></strong></span>
@@ -1759,11 +1916,15 @@
         <div id="container">
 
 <div id="section-meetings" class="hidden">
-  <div class="card">
+  <div class="meetings-tabs">
+    <button class="meetings-tab-btn active" type="button" data-meetings-tab="upcoming" onclick="setMeetingsTab('upcoming')">Upcoming Meetings</button>
+    <button class="meetings-tab-btn" type="button" data-meetings-tab="past" onclick="setMeetingsTab('past')">Past Meetings</button>
+  </div>
+  <div class="card meetings-tab-panel active" data-meetings-tab="upcoming">
     <h2>Upcoming Meetings</h2>
     <div id="meetings-upcoming-list"></div>
   </div>
-  <div class="card">
+  <div class="card meetings-tab-panel" data-meetings-tab="past">
     <h2>Past Meetings</h2>
     <div id="meetings-past-list"></div>
   </div>
@@ -1827,8 +1988,16 @@
 </div>
 
 <div id="section-ideas" class="hidden">
-  <div class="card">
-    <h2>Submit Resident Ideas/ Concerns</h2>
+  <div class="ideas-tabs">
+    <button class="ideas-tab-btn active" type="button" data-ideas-tab="list" onclick="setIdeasTab('list')">Ideas, Thoughts, Concerns</button>
+    <button class="ideas-tab-btn" type="button" data-ideas-tab="submit" onclick="setIdeasTab('submit')">Add Ideas/Concerns</button>
+  </div>
+  <div class="card ideas-tab-panel active" data-ideas-tab="list">
+    <h2>Ideas, Thoughts, Concerns</h2>
+    <div id="ideas-list"></div>
+  </div>
+  <div class="card ideas-tab-panel" data-ideas-tab="submit">
+    <h2>Add Idea Ideas/Concerns</h2>
     <label>Title</label>
     <input type="text" id="idea-title">
     <label>Description</label>
@@ -1848,13 +2017,21 @@
     </div>
     <div class="note hidden" id="idea-edit-note"></div>
   </div>
-  <div class="card">
-    <h2>Ideas, Thoughts, Concerns</h2>
-    <div id="ideas-list"></div>
-  </div>
 </div>
 
 <div id="section-voting" class="hidden">
+  <div class="votes-tabs">
+    <button class="votes-tab-btn active" type="button" data-votes-tab="active" onclick="setVotesTab('active')">Active Votes</button>
+    <button class="votes-tab-btn" type="button" data-votes-tab="closed" onclick="setVotesTab('closed')">Closed Votes</button>
+  </div>
+  <div class="card votes-tab-panel active" data-votes-tab="active">
+    <h2>Active Votes</h2>
+    <div id="votes-active-list"></div>
+  </div>
+  <div class="card votes-tab-panel" data-votes-tab="closed">
+    <h2>Closed Votes</h2>
+    <div id="votes-closed-list"></div>
+  </div>
   <div class="card" id="vote-admin-card">
     <h2>Create Vote (Board and Admin)</h2>
     <label>Topic</label>
@@ -1884,14 +2061,6 @@
       <button class="ghost-btn match-height hidden" type="button" id="vote-cancel-btn" onclick="cancelVoteEdit()">Cancel Edit</button>
     </div>
     <div class="note hidden" id="vote-edit-note"></div>
-  </div>
-  <div class="card">
-    <h2>Active Votes</h2>
-    <div id="votes-active-list"></div>
-  </div>
-  <div class="card">
-    <h2>Closed Votes</h2>
-    <div id="votes-closed-list"></div>
   </div>
 </div>
 
@@ -2050,7 +2219,18 @@
 </div>
 
 <div id="section-projects" class="hidden">
-  <div class="card" id="projects-admin-card">
+  <div class="projects-tabs">
+    <button class="projects-tab-btn active" type="button" data-projects-tab="list" onclick="setProjectsTab('list')">Project List</button>
+    <button class="projects-tab-btn" type="button" id="projects-tab-add" data-projects-tab="add" onclick="setProjectsTab('add')">Add Project</button>
+  </div>
+  <div class="card projects-tab-panel active" data-projects-tab="list">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+      <h2 style="margin: 6px 0 0;">Project List</h2>
+      <button class="primary small" type="button" onclick="exportProjectsWord()">Export Word Report</button>
+    </div>
+    <div id="projects-list" style="margin-top:40px;"></div>
+  </div>
+  <div class="card projects-tab-panel" id="projects-admin-card" data-projects-tab="add">
     <h2>Add Project (Board and Admin)</h2>
     <div class="flex-row" style="gap:16px; flex-wrap:wrap;">
       <div style="flex:2; min-width:220px;">
@@ -2115,13 +2295,6 @@
     </div>
     <div class="note hidden" id="proj-edit-note"></div>
   </div>
-  <div class="card">
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
-      <h2 style="margin: 6px 0 0;">Project List</h2>
-      <button class="primary small" type="button" onclick="exportProjectsWord()">Export Word Report</button>
-    </div>
-    <div id="projects-list" style="margin-top:40px;"></div>
-  </div>
 </div>
 
 <div id="section-users" class="hidden">
@@ -2163,12 +2336,6 @@
         </div>
       </div>
     </section>
-    <button class="settings-btn" id="settings-toggle" aria-label="Settings">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a6.94 6.94 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 14.9 2h-3.8a.5.5 0 0 0-.49.41l-.36 2.54c-.6.24-1.14.56-1.63.94l-2.39-.96a.5.5 0 0 0-.61.22L3.7 8.47a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L3.82 15.15a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.39.32.61.22l2.39-.96c.49.38 1.03.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.41h3.8a.5.5 0 0 0 .49-.41l.36-2.54c.6-.24 1.14-.56 1.63-.94l2.39.96c.23.09.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" fill="currentColor"></path>
-      </svg>
-      <span class="notification-dot hidden" id="settings-alert-dot" aria-hidden="true"></span>
-    </button>
     <div class="settings-flyout hidden" id="settings-panel">
       <h4>Quick Actions</h4>
       <button class="primary" type="button" onclick="handleLogout()">Logout</button>
@@ -2324,12 +2491,16 @@
   let documentEditId = null;
   let voteEditId = null;
   let duesAmountEditYear = null;
+  let activeMeetingsTab = "upcoming";
+  let activeVotesTab = "active";
   let activeDuesAdminTab = "activity";
   let activeDocumentsTab = "kingston";
+  let activeProjectsTab = "list";
   let residentLotSelectInitialized = false;
   let residentDocEditId = null;
   let ideaEditId = null;
   let ideaEditAttachments = [];
+  let activeIdeasTab = "list";
   let projectEditId = null;
   let projectEditQuoteAttachments = [];
   let projectEditImageAttachments = [];
@@ -2895,6 +3066,26 @@
     return Array.from(years).filter(Number.isFinite).sort((a, b) => a - b);
   }
 
+  function positionSettingsPanel() {
+    if (!settingsPanel || !settingsToggle) return;
+    const rect = settingsToggle.getBoundingClientRect();
+    const panelWidth = settingsPanel.offsetWidth || 240;
+    const margin = 12;
+    let left = rect.left;
+    let top = rect.bottom + 12;
+    if (left + panelWidth > window.innerWidth - margin) {
+      left = window.innerWidth - panelWidth - margin;
+    }
+    if (left < margin) left = margin;
+    if (top + settingsPanel.offsetHeight > window.innerHeight - margin) {
+      top = rect.top - settingsPanel.offsetHeight - 12;
+    }
+    settingsPanel.style.left = `${Math.max(margin, left)}px`;
+    settingsPanel.style.top = `${Math.max(margin, top)}px`;
+    settingsPanel.style.right = "auto";
+    settingsPanel.style.bottom = "auto";
+  }
+
   function initDomRefs() {
     if (!tileCards.length) {
       tileCards = Array.from(document.querySelectorAll(".tile-card"));
@@ -2907,6 +3098,9 @@
       settingsListenersInitialized = true;
       settingsToggle.addEventListener("click", () => {
         settingsPanel.classList.toggle("hidden");
+        if (!settingsPanel.classList.contains("hidden")) {
+          positionSettingsPanel();
+        }
       });
       document.addEventListener("click", event => {
         if (!settingsPanel || !settingsToggle) return;
@@ -2917,6 +3111,10 @@
     }
     initResidentDocLotSelect();
     resetProjectForm();
+    updateIdeasTabs();
+    updateMeetingsTabs();
+    updateVotesTabs();
+    updateProjectsTabs();
   }
 
   function initSuperAdmin() {
@@ -2927,7 +3125,7 @@
         id: "user_superadmin_default",
         name: "Super Admin",
         email: "admin@example.com",
-        password: "admin1234",
+        password: "admin123",
         role: "resident",
         permissions: { admin: true, superadmin: true },
         lot: "",
@@ -3104,8 +3302,17 @@
     if (voteAdminCard) {
       voteAdminCard.style.display = isAdminOrSuper(user) ? "block" : "none";
     }
-    document.getElementById("projects-admin-card").style.display =
-      adminVisible ? "block" : "none";
+    const projectsAdminCard = document.getElementById("projects-admin-card");
+    if (projectsAdminCard) {
+      projectsAdminCard.classList.toggle("hidden", !adminVisible);
+    }
+    const projectsAddTab = document.getElementById("projects-tab-add");
+    if (projectsAddTab) {
+      projectsAddTab.classList.toggle("hidden", !adminVisible);
+    }
+    if (!adminVisible) {
+      setProjectsTab("list");
+    }
     document.getElementById("dues-admin-card").style.display =
       adminVisible ? "block" : "none";
     const documentsAdminCard = document.getElementById("documents-admin-card");
@@ -3113,6 +3320,7 @@
       documentsAdminCard.style.display = adminVisible ? "block" : "none";
     }
     updateDocumentsTabs();
+    updateProjectsTabs();
     configureResidentDocLotField(user);
     const duesPanel = document.getElementById("dues-admin-panel");
     if (duesPanel) {
@@ -3163,6 +3371,94 @@
     if (activeDuesAdminTab === normalized) return;
     activeDuesAdminTab = normalized;
     updateDuesAdminTabs();
+  }
+
+  function updateIdeasTabs() {
+    const buttons = document.querySelectorAll(".ideas-tab-btn");
+    buttons.forEach(btn => {
+      const tab = btn.getAttribute("data-ideas-tab");
+      if (!tab) return;
+      btn.classList.toggle("active", tab === activeIdeasTab);
+    });
+    const panels = document.querySelectorAll(".ideas-tab-panel");
+    panels.forEach(panel => {
+      const tab = panel.getAttribute("data-ideas-tab");
+      if (!tab) return;
+      panel.classList.toggle("active", tab === activeIdeasTab);
+    });
+  }
+
+  function setIdeasTab(tab) {
+    const normalized = tab === "submit" ? "submit" : "list";
+    if (activeIdeasTab === normalized) return;
+    activeIdeasTab = normalized;
+    updateIdeasTabs();
+  }
+
+  function updateMeetingsTabs() {
+    const buttons = document.querySelectorAll(".meetings-tab-btn");
+    buttons.forEach(btn => {
+      const tab = btn.getAttribute("data-meetings-tab");
+      if (!tab) return;
+      btn.classList.toggle("active", tab === activeMeetingsTab);
+    });
+    const panels = document.querySelectorAll(".meetings-tab-panel");
+    panels.forEach(panel => {
+      const tab = panel.getAttribute("data-meetings-tab");
+      if (!tab) return;
+      panel.classList.toggle("active", tab === activeMeetingsTab);
+    });
+  }
+
+  function setMeetingsTab(tab) {
+    const normalized = tab === "past" ? "past" : "upcoming";
+    if (activeMeetingsTab === normalized) return;
+    activeMeetingsTab = normalized;
+    updateMeetingsTabs();
+  }
+
+  function updateVotesTabs() {
+    const buttons = document.querySelectorAll(".votes-tab-btn");
+    buttons.forEach(btn => {
+      const tab = btn.getAttribute("data-votes-tab");
+      if (!tab) return;
+      btn.classList.toggle("active", tab === activeVotesTab);
+    });
+    const panels = document.querySelectorAll(".votes-tab-panel");
+    panels.forEach(panel => {
+      const tab = panel.getAttribute("data-votes-tab");
+      if (!tab) return;
+      panel.classList.toggle("active", tab === activeVotesTab);
+    });
+  }
+
+  function setVotesTab(tab) {
+    const normalized = tab === "closed" ? "closed" : "active";
+    if (activeVotesTab === normalized) return;
+    activeVotesTab = normalized;
+    updateVotesTabs();
+  }
+
+  function updateProjectsTabs() {
+    const buttons = document.querySelectorAll(".projects-tab-btn");
+    buttons.forEach(btn => {
+      const tab = btn.getAttribute("data-projects-tab");
+      if (!tab) return;
+      btn.classList.toggle("active", tab === activeProjectsTab);
+    });
+    const panels = document.querySelectorAll(".projects-tab-panel");
+    panels.forEach(panel => {
+      const tab = panel.getAttribute("data-projects-tab");
+      if (!tab) return;
+      panel.classList.toggle("active", tab === activeProjectsTab);
+    });
+  }
+
+  function setProjectsTab(tab) {
+    const normalized = tab === "add" ? "add" : "list";
+    if (activeProjectsTab === normalized) return;
+    activeProjectsTab = normalized;
+    updateProjectsTabs();
   }
 
   function configureResidentDocLotField(user) {
@@ -3449,11 +3745,6 @@
   }
 
   function openBoardMembersModal() {
-    const user = getFullCurrentUser();
-    if (!isBoardOrAdmin(user)) {
-      alert("Only board members or admins can view board members.");
-      return;
-    }
     ensureDataAdminRefs();
     renderBoardMembers();
     if (boardMembersModal) boardMembersModal.classList.remove("hidden");
@@ -3686,14 +3977,26 @@
       detailTitleEl.textContent = SECTION_TITLES[id] || "Section Details";
     }
     renderDashboard();
-    if (id === "meetings") renderMeetings();
+    if (id === "meetings") {
+      setMeetingsTab("upcoming");
+      renderMeetings();
+    }
     if (id === "minutes") renderMinutes();
-    if (id === "ideas") renderIdeas();
-    if (id === "voting") renderVotes();
+    if (id === "ideas") {
+      setIdeasTab("list");
+      renderIdeas();
+    }
+    if (id === "voting") {
+      setVotesTab("active");
+      renderVotes();
+    }
     if (id === "financials") renderFinancials();
     if (id === "documents") renderDocuments();
     if (id === "dues") renderDues();
-    if (id === "projects") renderProjects();
+    if (id === "projects") {
+      setProjectsTab("list");
+      renderProjects();
+    }
     if (id === "users") renderUsers();
   }
 
@@ -5870,6 +6173,7 @@
       size: att.size || null
     }));
     updateIdeaAttachmentDisplay();
+    setIdeasTab("submit");
     if (submitBtn) submitBtn.textContent = "Update Idea";
     if (cancelBtn) cancelBtn.classList.remove("hidden");
     if (note) {
@@ -7251,6 +7555,7 @@
       note.textContent = "Editing: " + (project.name || "Project");
       note.classList.remove("hidden");
     }
+    setProjectsTab("add");
     document.getElementById("projects-admin-card").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
