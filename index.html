@@ -2409,7 +2409,7 @@
 
 <div id="section-users" class="hidden">
   <div class="card" id="users-admin-card">
-    <h2>User Management (Super Admin)</h2>
+    <h2>User Management (Admin)</h2>
     <h3>Pending Registrations</h3>
     <div id="users-pending-list" class="text-small"></div>
     <h3>All Users</h3>
@@ -3464,8 +3464,9 @@
       duesResidentCard.style.display = adminVisible ? "none" : "block";
     }
     const superOnly = isSuperAdmin(user);
+    const usersAdminVisible = isAdmin(user);
     document.getElementById("users-admin-card").style.display =
-      superOnly ? "block" : "none";
+      usersAdminVisible ? "block" : "none";
     const logBtn = document.getElementById("view-action-log-btn");
     if (logBtn) logBtn.classList.toggle("hidden", !superOnly);
     const dataBtn = document.getElementById("data-admin-btn");
@@ -7949,6 +7950,7 @@
     const pendingDiv = document.getElementById("users-pending-list");
     const allDiv = document.getElementById("users-all-list");
     const canManage = isBoardOrAdmin(current);
+    const canAdminUsers = isAdmin(current);
     const isSuper = isSuperAdmin(current);
     if (!canManage) {
       pendingDiv.textContent = "Only board members or admins can manage users.";
@@ -8021,7 +8023,7 @@
       }
       htmlAll += "</td>";
       htmlAll += "<td>";
-      if (isSuper && !isSuperAdmin(u)) {
+      if (canAdminUsers && !isSuperAdmin(u)) {
         htmlAll += "<div class='role-actions'>";
         htmlAll += "<button class='small role-btn role-btn-resident' onclick=\"setUserRole('" + u.id + "','resident')\">Resident</button>";
         htmlAll += "<button class='small role-btn role-btn-board' onclick=\"setUserRole('" + u.id + "','board')\">Board</button>";
@@ -8029,7 +8031,7 @@
       }
       htmlAll += "</td>";
       htmlAll += "<td class='user-actions-cell'>";
-      if (isSuper && !isSuperAdmin(u)) {
+      if (canAdminUsers && !isSuperAdmin(u)) {
         htmlAll += "<div class='user-actions'>";
         htmlAll += "<div class='user-action-row'>";
         htmlAll += "<button class='icon-btn user-action-icon' type='button' onclick=\"toggleUserEdit('" + u.id + "')\" aria-label='Edit user'>";
@@ -8045,15 +8047,17 @@
           htmlAll += "</svg>";
         }
         htmlAll += "</button>";
-        htmlAll += "<button class='icon-btn user-action-icon danger' type='button' onclick=\"deleteUser('" + u.id + "')\" aria-label='Delete user'>";
-        htmlAll += "<svg viewBox='0 0 24 24' aria-hidden='true'>";
-        htmlAll += "<path d='M3 6h18'></path>";
-        htmlAll += "<path d='M8 6V4h8v2'></path>";
-        htmlAll += "<path d='M6 6l1 14h10l1-14'></path>";
-        htmlAll += "<path d='M10 11v6'></path>";
-        htmlAll += "<path d='M14 11v6'></path>";
-        htmlAll += "</svg>";
-        htmlAll += "</button>";
+        if (isSuper) {
+          htmlAll += "<button class='icon-btn user-action-icon danger' type='button' onclick=\"deleteUser('" + u.id + "')\" aria-label='Delete user'>";
+          htmlAll += "<svg viewBox='0 0 24 24' aria-hidden='true'>";
+          htmlAll += "<path d='M3 6h18'></path>";
+          htmlAll += "<path d='M8 6V4h8v2'></path>";
+          htmlAll += "<path d='M6 6l1 14h10l1-14'></path>";
+          htmlAll += "<path d='M10 11v6'></path>";
+          htmlAll += "<path d='M14 11v6'></path>";
+          htmlAll += "</svg>";
+          htmlAll += "</button>";
+        }
         htmlAll += "</div>";
         htmlAll += "<button class='small user-action-btn' onclick=\"resetUserPassword('" + u.id + "')\">Reset Password</button>";
         htmlAll += "</div>";
@@ -8178,9 +8182,18 @@
   }
 
   function setUserRole(id, role) {
+    const current = getFullCurrentUser();
+    if (!isAdmin(current)) {
+      alert("Only admins and super admins can update roles.");
+      return;
+    }
     let users = loadLocalData(STORAGE_KEYS.users);
     const u = users.find(x => x.id === id);
     if (!u) return;
+    if (isSuperAdmin(u)) {
+      alert("Super admin roles cannot be changed.");
+      return;
+    }
     const normalized = role === "board" ? "board" : "resident";
     const prevRole = u.role || "resident";
     u.role = normalized;
@@ -8211,8 +8224,8 @@
 
   function resetUserPassword(id) {
     const current = getFullCurrentUser();
-    if (!isSuperAdmin(current)) {
-      alert("Only the super admin can reset passwords.");
+    if (!isAdmin(current)) {
+      alert("Only admins and super admins can reset passwords.");
       return;
     }
     let users = loadLocalData(STORAGE_KEYS.users);
@@ -8259,8 +8272,15 @@
 
   function toggleUserEdit(id) {
     const current = getFullCurrentUser();
-    if (!isSuperAdmin(current)) {
-      alert("Only the super admin can edit users.");
+    if (!isAdmin(current)) {
+      alert("Only admins and super admins can edit users.");
+      return;
+    }
+    let users = loadLocalData(STORAGE_KEYS.users);
+    const target = users.find(u => u.id === id);
+    if (!target) return;
+    if (isSuperAdmin(target)) {
+      alert("Super admin accounts cannot be edited.");
       return;
     }
     const isEditing = !!userEditStates[id];
@@ -8278,9 +8298,6 @@
       alert("Name and email are required.");
       return;
     }
-    let users = loadLocalData(STORAGE_KEYS.users);
-    const target = users.find(u => u.id === id);
-    if (!target) return;
     const duplicate = users.find(u => u.id !== id && (u.email || "").toLowerCase() === nextEmail);
     if (duplicate) {
       alert("Another user already has that email.");
