@@ -4,6 +4,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>HOA Portal</title>
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="apple-touch-icon" href="/favicon.png">
@@ -1679,6 +1680,68 @@
       margin-top: 2px;
       white-space: pre-wrap;
       word-break: break-word;
+    }
+
+    @media (max-width: 900px) {
+      #app {
+        padding: 0 16px 100px;
+        background-attachment: scroll;
+      }
+
+      .dashboard {
+        padding: 44px 32px 80px;
+      }
+
+      .banner-inner {
+        flex-wrap: wrap;
+      }
+
+      #user-info {
+        align-items: flex-start;
+        text-align: left;
+      }
+
+      .hero {
+        padding-right: 0;
+      }
+
+      .flex-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .flex-row > div {
+        min-width: 0 !important;
+        width: 100%;
+      }
+
+      .project-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .project-actions .primary,
+      .project-actions .ghost-btn {
+        min-width: 0;
+        max-width: none;
+        width: 100%;
+      }
+
+      table {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      th,
+      td {
+        white-space: nowrap;
+      }
+
+      .lot-map-viewport {
+        touch-action: pan-y;
+      }
     }
 
     @media (max-width: 640px) {
