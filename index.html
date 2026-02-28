@@ -2793,15 +2793,20 @@
     setStatusVisible(true, message || "Working…");
   }
 
-  function endActivity() {
+  function endActivity(delayMs = 0) {
     activityCount = Math.max(0, activityCount - 1);
     if (activityCount === 0) {
-      statusHideTimer = setTimeout(() => {
+      const hide = () => {
         if (activityCount === 0) {
           setStatusVisible(false);
         }
         statusHideTimer = null;
-      }, 2000);
+      };
+      if (delayMs > 0) {
+        statusHideTimer = setTimeout(hide, delayMs);
+      } else {
+        hide();
+      }
     }
   }
 
@@ -2823,7 +2828,7 @@
       timestamp: new Date().toISOString()
     };
 
-    beginActivity("Saving updates…");
+    beginActivity("Saving updates… Please be patient...");
     try {
       const res = await fetch('/api/save', {
         method: 'POST',
@@ -2837,7 +2842,7 @@
       console.error('Blob save error:', err);
       localStorage.setItem('hoa-state', JSON.stringify(fullState));
     } finally {
-      endActivity();
+      endActivity(4000);
     }
   }
 
@@ -2859,7 +2864,7 @@
         applyRemoteData(parsed, "local");
       }
     } finally {
-      endActivity();
+      endActivity(1000);
     }
 
     renderDashboard();
@@ -2961,7 +2966,7 @@
       console.warn("Section refresh failed; using cached data", err);
       renderSectionById(id);
     } finally {
-      endActivity();
+      endActivity(1000);
     }
   }
 
@@ -3296,7 +3301,7 @@
     } catch (err) {
       console.warn("Login refresh failed; using cached data", err);
     } finally {
-      endActivity();
+      endActivity(1000);
     }
     const users = loadLocalData(STORAGE_KEYS.users);
     const user = users.find(u => (u.email || "").toLowerCase() === email);
@@ -4859,7 +4864,7 @@
       }
       return await res.json();
     } finally {
-      endActivity();
+      endActivity(3000);
     }
   }
 
