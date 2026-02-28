@@ -1691,10 +1691,12 @@
       .banner-inner {
         padding: 10px 16px;
         gap: 12px;
+        flex-wrap: nowrap;
       }
 
       .banner-left {
         gap: 10px;
+        min-width: 0;
       }
 
       .settings-btn {
@@ -1721,6 +1723,9 @@
       #user-info {
         font-size: 0.85rem;
         gap: 2px;
+        margin-left: auto;
+        align-items: flex-end;
+        text-align: right;
       }
 
       .app-banner .pill {
@@ -1804,13 +1809,13 @@
       }
 
       .banner-inner {
-        flex-direction: column;
-        align-items: flex-start;
+        flex-direction: row;
+        align-items: center;
       }
 
       #user-info {
-        justify-content: flex-start;
-        text-align: left;
+        justify-content: flex-end;
+        text-align: right;
       }
 
       .dashboard {
