@@ -166,6 +166,16 @@
       margin-top: 0;
     }
 
+    .reg-actions .lot-map-btn {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .reg-actions .lot-map-btn:hover {
+      background: #b07f3f;
+      border-color: #b07f3f;
+    }
+
     .lot-map-image {
       width: 100%;
       height: auto;
@@ -1879,16 +1889,16 @@
     <div id="login-right">
       <h2>Register</h2>
       <label>Full Name</label>
-      <input type="text" id="reg-name">
+      <input type="text" id="reg-name" required>
       <label>Email</label>
-      <input type="email" id="reg-email">
+      <input type="email" id="reg-email" required>
       <label>Lot Number (1 to 102, excluding 13, 55, 56)</label>
-      <input type="number" id="reg-lot" min="1" max="102">
+      <input type="number" id="reg-lot" min="1" max="102" required>
       <label>Password</label>
-      <input type="password" id="reg-password">
+      <input type="password" id="reg-password" required>
       <div class="reg-actions">
         <button class="primary" onclick="handleRegister()">Submit Registration</button>
-        <button class="ghost-btn" type="button" onclick="openLotMap()">Lot Map</button>
+        <button class="ghost-btn lot-map-btn" type="button" onclick="openLotMap()">Lot Map</button>
       </div>
       <div class="note">
         Registration requires admin approval before you can log in.
@@ -3346,12 +3356,17 @@
     const email = (emailInput.value || "").trim().toLowerCase();
     const lotRaw = (lotInput.value || "").trim();
     const password = passwordInput.value || "";
-    if (!name || !email || !password) {
-      alert("Full name, email, and password are required.");
+    const missing = [];
+    if (!name) missing.push("Full Name");
+    if (!email) missing.push("Email");
+    if (!lotRaw) missing.push("Lot Number");
+    if (!password) missing.push("Password");
+    if (missing.length) {
+      alert("Please fill in: " + missing.join(", ") + ".");
       return;
     }
-    const lot = lotRaw ? parseInt(lotRaw, 10) : null;
-    if (lotRaw && !isValidLotNumber(lot)) {
+    const lot = parseInt(lotRaw, 10);
+    if (!isValidLotNumber(lot)) {
       alert("Enter a valid lot number between 1 and " + TOTAL_LOTS + " (excluding " + EXCLUDED_LOTS.join(", ") + ").");
       return;
     }
@@ -3365,7 +3380,7 @@
       name,
       email,
       password,
-      lot: lot || "",
+      lot,
       role: "resident",
       permissions: { admin: false, superadmin: false },
       approved: false,
